@@ -487,7 +487,7 @@ linux中使用已经建立的空目录作为挂载点
 >   ```bash
 >   # 快速返回家目录
 >   cd ~
->             
+>                     
 >   # 访问其他用户家目录
 >   cd ~alice  # 进入alice用户的家目录
 >   ```
@@ -518,13 +518,13 @@ linux中使用已经建立的空目录作为挂载点
 >   ```bash
 >   # 查看当前主机名
 >   hostname
->             
+>                     
 >   # 查看完整主机名
 >   hostname -f
->             
+>                     
 >   # 临时修改主机名
 >   hostname myserver
->             
+>                     
 >   # 永久修改主机名（CentOS/RHEL）
 >   hostnamectl set-hostname myserver.example.com
 >   ```
@@ -554,17 +554,17 @@ linux中使用已经建立的空目录作为挂载点
 >   ```bash
 >   # 查看当前的PS1设置
 >   echo $PS1
->             
+>                     
 >   # 常见的PS1格式（CentOS为例）
 >   [\u@\h \W]\$
 >   # \u: 用户名
 >   # \h: 主机名
 >   # \W: 当前目录（基名）
 >   # \$: 提示符（#或$）
->             
+>                     
 >   # 修改PS1变量（临时）
 >   PS1="[\u@\H \w]\$ "  # \H: 完整主机名，\w: 完整路径
->             
+>                     
 >   # 永久修改（添加到~/.bashrc）
 >   echo 'export PS1="[\u@\h \w]\$ "' >> ~/.bashrc
 >   source ~/.bashrc
@@ -2483,9 +2483,7 @@ source ~/.bashrc
 
 ##### **1. 权限问题诊断**
 
-bash
-
-```
+```bash
 # 检查为什么无法执行文件
 ls -l script.sh
 # 如果是 -rw-r--r--，缺少执行权限
@@ -2512,9 +2510,7 @@ ls -l file.txt
 
 ##### **3. 常用场景权限设置**
 
-bash
-
-```
+```bash
 # Web服务器
 chown -R www-data:www-data /var/www/html
 find /var/www/html -type d -exec chmod 755 {} \;
@@ -2535,9 +2531,7 @@ chmod 600 ~/.ssh/id_rsa
 
 ##### **4. 权限恢复技巧**
 
-bash
-
-```
+```bash
 # 误操作后恢复默认权限
 # 文件恢复为644，目录恢复为755
 find /path -type f -exec chmod 644 {} \;
@@ -5454,7 +5448,7 @@ root:x:0:0:root:/root:/bin/bash
 
 **文件结构：**
 
-```
+```bash
 用户名:加密密码:最后修改日期:最小修改间隔:密码有效期:警告期:宽限期:失效时间:保留
 
 eg
@@ -5871,9 +5865,7 @@ newgrp 组名
 
 ### 示例1：创建带特定属性的用户
 
-bash
-
-```
+```bash
 # 创建组
 groupadd lamp1
 
@@ -5886,9 +5878,7 @@ useradd -u 1050 -g lamp1 -G root -d /home/lamp1 \
 
 ### 示例2：批量添加用户密码
 
-bash
-
-```
+```bash
 # 使用管道设置密码
 echo "password123" | passwd --stdin user1
 ```
@@ -5897,9 +5887,7 @@ echo "password123" | passwd --stdin user1
 
 ### 示例3：强制用户首次登录修改密码
 
-bash
-
-```
+```bash
 # 将密码最后修改日期设为0
 chage -d 0 username
 ```
@@ -5908,9 +5896,7 @@ chage -d 0 username
 
 ### 示例4：用户组管理
 
-bash
-
-```
+```bash
 # 创建组
 groupadd grouptest
 
@@ -6640,3 +6626,4635 @@ lsattr 文件/目录
    - 准备权限恢复方案
 
 这份完整的权限管理文档涵盖了Linux系统中所有高级权限管理技术，包括ACL、sudo、特殊权限和文件系统属性，是系统管理员进行精细权限控制的重要参考资料。
+
+# 定时任务
+
+## 第一章：定时任务调度概述
+
+定时任务调度是指让系统在指定时间自动执行某个命令或脚本。Linux 中常用的定时任务主要有两类：
+
+| 类型 | 工具 | 特点 | 典型场景 |
+| :--- | :--- | :--- | :--- |
+| 周期性任务 | `crond` / `crontab` | 按分钟、小时、日期、星期等周期重复执行 | 日志切割、数据库备份、定时同步时间、定期巡检 |
+| 一次性任务 | `at` | 只在未来某个时间执行一次，执行完即结束 | 临时延迟执行命令、指定时间重启服务、一次性清理文件 |
+| 现代系统任务 | `systemd timer` | 与 systemd 服务集成，日志、依赖、错过补跑能力更强 | 生产环境复杂定时任务、需要明确依赖关系的任务 |
+
+> PDF 中本章重点讲的是 `crond` 周期任务和 `at` 一次性任务。实际生产环境中，如果任务比较简单，优先掌握 `crontab`；如果任务需要依赖 systemd 服务状态、失败追踪、错过执行后补跑，可以考虑 `systemd timer`。
+
+------
+
+## 第二章：`crond` 周期任务调度
+
+### 1. `crond` 基本概念
+
+`crond` 是 Linux 中用于周期性执行任务的后台守护进程。用户通过 `crontab` 写入调度规则，`crond` 会按规则检查时间并执行对应命令。
+
+任务调度可以分为两类：
+
+1. **系统级任务**
+   - 系统维护任务，由系统或 root 管理。
+   - 例如日志轮转、临时文件清理、系统状态采集。
+2. **用户级任务**
+   - 某个用户自己的周期性任务。
+   - 例如普通用户定时备份个人目录、定时运行脚本。
+
+### 2. `crond` 服务管理
+
+不同发行版命令略有差异：
+
+```bash
+# CentOS 7+ / Ubuntu / Debian 等 systemd 系统
+systemctl status crond      # CentOS/RHEL
+systemctl status cron       # Ubuntu/Debian
+
+systemctl start crond
+systemctl restart crond
+systemctl enable crond
+
+# CentOS 6 等老系统
+service crond status
+service crond restart
+chkconfig crond on
+```
+
+Ubuntu/Debian 中服务名通常是 `cron`，CentOS/RHEL 中通常是 `crond`。
+
+### 3. `crontab` 基本语法
+
+```bash
+crontab [选项]
+```
+
+常用选项：
+
+| 选项 | 作用 |
+| :--- | :--- |
+| `-e` | 编辑当前用户的定时任务 |
+| `-l` | 查看当前用户的定时任务 |
+| `-r` | 删除当前用户的全部定时任务，谨慎使用 |
+| `-u 用户名` | 指定用户，仅 root 可用 |
+
+示例：
+
+```bash
+crontab -e          # 编辑当前用户任务
+crontab -l          # 查看当前用户任务
+crontab -r          # 删除当前用户所有任务
+
+sudo crontab -u root -l
+sudo crontab -u tom -e
+```
+
+### 4. cron 表达式格式
+
+用户级 `crontab -e` 中每一行格式如下：
+
+```bash
+分 时 日 月 周 命令
+```
+
+5 个时间字段含义：
+
+| 字段 | 含义 | 取值范围 |
+| :--- | :--- | :--- |
+| 第 1 位 | 分钟 | `0-59` |
+| 第 2 位 | 小时 | `0-23` |
+| 第 3 位 | 日期 | `1-31` |
+| 第 4 位 | 月份 | `1-12` |
+| 第 5 位 | 星期 | `0-7`，`0` 和 `7` 都表示星期日 |
+
+特殊符号：
+
+| 符号 | 含义 | 示例 |
+| :--- | :--- | :--- |
+| `*` | 任意时间 | `* * * * *` 每分钟 |
+| `,` | 多个离散值 | `0 8,12,18 * * *` 每天 8 点、12 点、18 点 |
+| `-` | 连续范围 | `0 9-18 * * *` 每天 9 点到 18 点每小时 |
+| `/` | 步长 | `*/5 * * * *` 每 5 分钟 |
+
+常用时间写法：
+
+| 表达式 | 含义 |
+| :--- | :--- |
+| `* * * * *` | 每分钟执行一次 |
+| `*/1 * * * *` | 每 1 分钟执行一次 |
+| `*/5 * * * *` | 每 5 分钟执行一次 |
+| `0 * * * *` | 每小时整点执行一次 |
+| `0 2 * * *` | 每天凌晨 2 点执行一次 |
+| `30 3 * * 1` | 每周一凌晨 3:30 执行一次 |
+| `0 0 1 * *` | 每月 1 号 0 点执行一次 |
+| `0 9 * * 1-5` | 周一到周五每天 9 点执行一次 |
+| `0 2 1 1 *` | 每年 1 月 1 日凌晨 2 点执行一次 |
+
+注意：不要同时复杂限制“日期”和“星期”。在很多 cron 实现中，如果日期字段和星期字段都不是 `*`，二者通常是“或”的关系，容易导致执行次数超出预期。
+
+### 5. 快速入门案例
+
+#### 案例 1：每分钟追加当前日期到文件
+
+```bash
+crontab -e
+```
+
+写入：
+
+```bash
+*/1 * * * * date >> /tmp/mydate
+```
+
+查看结果：
+
+```bash
+tail -f /tmp/mydate
+```
+
+#### 案例 2：每分钟追加日期和日历到文件
+
+编写脚本：
+
+```bash
+vim /home/my.sh
+```
+
+脚本内容：
+
+```bash
+#!/bin/bash
+date >> /home/mycal
+cal >> /home/mycal
+```
+
+增加执行权限：
+
+```bash
+chmod u+x /home/my.sh
+```
+
+加入定时任务：
+
+```bash
+crontab -e
+```
+
+写入：
+
+```bash
+*/1 * * * * /home/my.sh
+```
+
+#### 案例 3：每天凌晨 2 点备份 MySQL 数据库
+
+基础写法：
+
+```bash
+0 2 * * * /usr/bin/mysqldump -uroot -p密码 testdb > /home/db.bak
+```
+
+更推荐的生产写法：不要把数据库密码直接写在 `crontab` 中，可以写入 root 用户的 `~/.my.cnf`。
+
+```ini
+[client]
+user=root
+password=你的密码
+```
+
+限制权限：
+
+```bash
+chmod 600 ~/.my.cnf
+```
+
+定时任务：
+
+```bash
+0 2 * * * /usr/bin/mysqldump testdb > /backup/testdb_$(date +\%F).sql 2>> /var/log/mysql_backup.err
+```
+
+cron 中 `%` 有特殊含义，如果要在命令里使用 `date +%F`，需要写成 `date +\%F`。
+
+### 6. 用户级任务与系统级任务
+
+#### 用户级任务
+
+通过 `crontab -e` 添加，任务文件通常保存在：
+
+```bash
+/var/spool/cron/用户名        # CentOS/RHEL
+/var/spool/cron/crontabs/用户名 # Ubuntu/Debian
+```
+
+不建议直接编辑这些文件，推荐使用 `crontab -e`。
+
+#### 系统级任务
+
+系统级配置文件常见位置：
+
+| 路径 | 作用 |
+| :--- | :--- |
+| `/etc/crontab` | 系统级 crontab 配置 |
+| `/etc/cron.d/` | 系统级定时任务片段目录 |
+| `/etc/cron.hourly/` | 每小时执行的脚本目录 |
+| `/etc/cron.daily/` | 每天执行的脚本目录 |
+| `/etc/cron.weekly/` | 每周执行的脚本目录 |
+| `/etc/cron.monthly/` | 每月执行的脚本目录 |
+
+`/etc/crontab` 和 `/etc/cron.d/` 中通常多一个“执行用户”字段：
+
+```bash
+分 时 日 月 周 用户 命令
+```
+
+示例：
+
+```bash
+SHELL=/bin/bash
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=root
+
+0 2 * * * root /usr/local/sbin/backup.sh
+```
+
+### 7. cron 执行环境注意事项
+
+cron 执行任务时不是完整的登录 shell 环境，常见问题都和环境变量有关。
+
+1. **使用绝对路径**
+
+```bash
+# 不推荐
+0 2 * * * mysqldump testdb > /backup/db.sql
+
+# 推荐
+0 2 * * * /usr/bin/mysqldump testdb > /backup/db.sql
+```
+
+2. **脚本中显式声明解释器**
+
+```bash
+#!/bin/bash
+```
+
+3. **必要时在脚本中设置 PATH**
+
+```bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+```
+
+4. **处理输出**
+
+cron 任务如果有标准输出或错误输出，可能会尝试发本地邮件。生产环境建议显式重定向：
+
+```bash
+0 2 * * * /path/job.sh >> /var/log/job.log 2>&1
+```
+
+5. **避免重复执行**
+
+如果任务执行时间可能超过调度间隔，可以使用 `flock` 加锁：
+
+当 cron 任务执行时间可能超过调度间隔时（比如每分钟执行一次，但脚本有时要跑 2 分钟），不加锁会导致多个脚本实例同时运行，产生资源冲突、数据错乱等风险。
+使用 `flock` 可以保证**同一时刻只有一个实例在执行**。
+
+**示例**：
+
+bash
+
+```
+* * * * * /usr/bin/flock -n /tmp/myjob.lock -c "/usr/bin/php /path/to/myjob.php"
+```
+
+- `-n`：非阻塞，锁被占用时立即失败（不运行新实例）。
+- 若不用 `-n`，则后续实例会等待锁释放，可能导致任务堆积。
+
+```bash
+*/5 * * * * /usr/bin/flock -n /tmp/job.lock /usr/local/bin/job.sh >> /var/log/job.log 2>&1
+```
+
+### 8. cron 权限控制
+
+cron 可以通过以下文件限制用户是否允许使用：
+
+| 文件 | 作用 |
+| :--- | :--- |
+| `/etc/cron.allow` | 只允许文件中列出的用户使用 cron |
+| `/etc/cron.deny` | 禁止文件中列出的用户使用 cron |
+
+一般规则：
+
+1. 如果存在 `/etc/cron.allow`，只有该文件中的用户可以使用 `crontab`。
+2. 如果不存在 `/etc/cron.allow`，但存在 `/etc/cron.deny`，不在 deny 文件中的用户可以使用。
+3. root 通常不受限制。
+
+### 9. cron 日志与排错
+
+查看定时任务是否写入：
+
+```bash
+crontab -l
+```
+
+查看服务是否运行：
+
+```bash
+systemctl status crond
+systemctl status cron
+```
+
+查看日志：
+
+```bash
+# CentOS/RHEL
+tail -f /var/log/cron
+
+# Ubuntu/Debian
+tail -f /var/log/syslog | grep CRON
+
+# systemd 日志
+journalctl -u crond
+journalctl -u cron
+```
+
+常见排错清单：/var/log/job.log
+
+| 问题 | 排查方向 |
+| :--- | :--- |
+| 任务完全不执行 | `crond/cron` 服务是否启动，表达式是否正确 |
+| 手动执行成功，cron 中失败 | 环境变量、命令绝对路径、脚本执行权限 |
+| 输出文件没生成 | 目录是否存在，运行用户是否有写权限 |
+| 脚本执行异常 | 增加日志 `>> /var/log/job.log 2>&1` |
+| 数据库备份失败 | 密码配置、命令路径、目标目录权限 |
+| 执行次数不符合预期 | 检查“日期”和“星期”是否同时限制 |
+
+------
+
+## 第三章：`at` 一次性定时任务
+
+### 1. `at` 基本概念
+
+`at` 用于安排一次性任务。
+
+**它依赖 `atd` 守护进程后台检查任务队列，到达指定时间后执行任务，执行完成后不会再次执行。**
+
+检查 `atd` 是否运行：
+
+```bash
+ps -ef | grep atd
+```
+
+服务管理：
+
+```bash
+systemctl status atd
+systemctl start atd
+systemctl enable atd
+```
+
+如果系统没有安装：
+
+```bash
+# CentOS/RHEL
+yum install -y at
+
+# Ubuntu/Debian
+apt install -y at
+```
+
+### 2. `at` 命令格式
+
+```bash
+at [选项] [时间]
+```
+
+输入命令后，按 `Ctrl+D` 结束输入。
+
+常用选项：
+
+| 选项 | 作用 |
+| :--- | :--- |
+| `-l` | 查看等待执行的任务，等同于 `atq` |
+| `-d 任务号` | 删除指定任务，等同于 `atrm 任务号` |
+| `-c 任务号` | 查看指定任务的实际内容 |
+| `-f 文件` | 从文件读取要执行的命令 |
+| `-m` | 任务完成后发送邮件通知 |
+
+### 3. `at` 时间写法
+
+`at` 支持比较灵活的时间格式：
+
+| 写法 | 示例 | 含义 |
+| :--- | :--- | :--- |
+| 具体时间 | `at 04:00` | 今天 4 点；如果已过，则明天 4 点 |
+| 模糊时间 | `at noon` | 中午 |
+| 模糊时间 | `at midnight` | 深夜 0 点 |
+| 模糊时间 | `at teatime` | 下午 4 点左右 |
+| 12 小时制 | `at 12pm` | 中午 12 点 |
+| 指定日期 | `at 04:00 2026-06-15` | 指定日期的 4 点 |
+| 相对时间 | `at now + 5 minutes` | 5 分钟后 |
+| 相对时间 | `at now + 2 hours` | 2 小时后 |
+| 相对时间 | `at now + 3 days` | 3 天后 |
+| 日期词 | `at tomorrow` | 明天此时或默认时间 |
+
+### 4. `at` 使用示例
+
+#### 案例 1：2 天后的下午 5 点执行命令
+
+```bash
+at 5pm + 2 days
+```
+
+输入：
+
+```bash
+/bin/ls /home > /tmp/home_list.txt
+```
+
+按 `Ctrl+D` 结束。
+
+#### 案例 2：5 分钟后输出一句话
+
+```bash
+at now + 5 minutes
+```
+
+输入：
+
+```bash
+echo "hello at" >> /tmp/at_test.log
+```
+
+按 `Ctrl+D` 结束。
+
+#### 案例 3：从脚本文件读取任务
+
+```bash
+vim /tmp/at_job.sh
+```
+
+内容：
+
+```bash
+#!/bin/bash
+date >> /tmp/at_job.log
+df -h >> /tmp/at_job.log
+```
+
+提交任务：
+
+```bash
+at -f /tmp/at_job.sh now + 10 minutes
+```
+
+### 5. 查看和删除 `at` 任务
+
+```bash
+atq              # 查看任务队列
+at -l            # 同 atq
+
+atrm 3           # 删除任务号为 3 的任务
+at -d 3          # 同 atrm 3
+
+at -c 3          # 查看任务号为 3 的任务内容
+```
+
+### 6. `at` 权限控制
+
+`at` 的访问控制文件：
+
+| 文件 | 作用 |
+| :--- | :--- |
+| `/etc/at.allow` | 只允许文件中列出的用户使用 `at` |
+| `/etc/at.deny` | 禁止文件中列出的用户使用 `at` |
+
+优先级和 cron 类似：
+
+1. 如果存在 `/etc/at.allow`，只有其中列出的用户可以使用。
+2. 如果不存在 `/etc/at.allow`，则检查 `/etc/at.deny`。
+3. root 通常可以使用。
+
+------
+
+## 第四章：`crontab` 与 `at` 对比
+
+| 对比项 | `crontab` | `at` |
+| :--- | :--- | :--- |
+| 执行次数 | 周期性重复执行 | 一次性执行 |
+| 守护进程 | `crond` / `cron` | `atd` |
+| 适合场景 | 固定周期维护任务 | 临时预约任务 |
+| 查看任务 | `crontab -l` | `atq` / `at -l` |
+| 删除任务 | `crontab -r` 或编辑删除单行 | `atrm 任务号` |
+| 配置复杂度 | 时间表达式更严格 | 时间写法更灵活 |
+
+简单判断：
+
+1. 每天、每周、每月都要执行：用 `crontab`。
+2. 只想在某个未来时间执行一次：用 `at`。
+3. 任务依赖其他 systemd 服务，或者需要错过后补跑：考虑 `systemd timer`。
+
+------
+
+## 第五章：`systemd timer` 简介补充
+
+在使用 systemd 的系统上，`timer` 可以替代一部分 cron 任务。它通常由两个文件组成：
+
+1. `.service`：定义真正执行什么命令。
+2. `.timer`：定义什么时候触发 `.service`。
+
+示例：每天凌晨 2 点执行备份脚本。
+
+`/etc/systemd/system/backup.service`：
+
+```ini
+[Unit]
+Description=Daily backup job
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/backup.sh
+```
+
+`/etc/systemd/system/backup.timer`：
+
+```ini
+[Unit]
+Description=Run backup job daily
+
+[Timer]
+OnCalendar=*-*-* 02:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+启用：
+
+```bash
+systemctl daemon-reload
+systemctl enable --now backup.timer
+systemctl list-timers
+journalctl -u backup.service
+```
+
+`Persistent=true` 表示如果机器在计划时间关机，开机后会补跑错过的任务。这是 cron 默认不具备的能力。
+
+------
+
+## 第六章：定时任务最佳实践
+
+1. **脚本使用绝对路径**
+   - cron 环境变量较少，不要依赖登录 shell 中的 PATH。
+2. **所有任务都写日志**
+   - 推荐 `>> /var/log/xxx.log 2>&1`。
+3. **避免把密码直接写进 crontab**
+   - 数据库密码可以放入权限为 `600` 的配置文件。
+4. **任务必须可重复执行**
+   - 脚本应尽量具备幂等性，重复执行不应破坏数据。
+5. **长任务加锁**
+   - 使用 `flock` 防止上一轮未结束时下一轮又启动。
+6. **先手动执行，再加入调度**
+   - 确认脚本本身正确，再排查 cron 环境问题。
+7. **注意系统时间**
+   - 定时任务依赖系统时间，应配置 NTP/chrony 保证时间准确。
+8. **不要随意使用 root**
+   - 能用普通用户执行的任务，不要放到 root 的 crontab。
+9. **修改前先备份**
+   - 编辑重要定时任务前先执行 `crontab -l > cron.bak`。
+
+常用备份命令：
+
+```bash
+# 备份当前用户定时任务
+crontab -l > ~/crontab.bak
+
+# 从备份恢复
+crontab ~/crontab.bak
+```
+
+------
+
+## 🔧 实用命令汇总
+
+### cron 相关
+
+```bash
+# 编辑、查看、删除当前用户定时任务
+crontab -e
+crontab -l
+crontab -r
+
+# 查看指定用户定时任务
+sudo crontab -u root -l
+
+# 服务管理
+systemctl status crond
+systemctl restart crond
+systemctl enable crond
+
+# Ubuntu/Debian
+systemctl status cron
+systemctl restart cron
+systemctl enable cron
+```
+
+### at 相关
+
+```bash
+# 提交一次性任务
+at now + 5 minutes
+at 5pm tomorrow
+
+# 查看和删除任务
+atq
+at -l
+atrm 任务号
+at -d 任务号
+
+# 查看任务内容
+at -c 任务号
+
+# 服务管理
+systemctl status atd
+systemctl start atd
+systemctl enable atd
+```
+
+### 日志排查
+
+```bash
+# CentOS/RHEL
+tail -f /var/log/cron
+
+# Ubuntu/Debian
+tail -f /var/log/syslog | grep CRON
+
+# systemd
+journalctl -u crond
+journalctl -u cron
+journalctl -u atd
+```
+
+------
+
+## 📌 总结要点
+
+1. `crontab` 用于周期性任务，`at` 用于一次性任务。
+2. `crontab` 的核心格式是：`分 时 日 月 周 命令`。
+3. 用户级 `crontab` 没有“用户”字段，系统级 `/etc/crontab` 通常有“用户”字段。
+4. cron 环境变量很少，脚本中应使用绝对路径并显式处理日志。
+5. `at` 任务执行完后自动结束，适合临时预约执行。
+6. 生产环境中，复杂任务可以考虑 `systemd timer`，方便查看日志、管理依赖和补跑错过任务。
+
+# 网络配置
+
+## 第一章：网络配置概述
+
+Linux 网络配置的核心目标是让主机具备正确的 IP 地址、网关、DNS 和路由，从而可以访问局域网或公网。
+
+常见网络配置项：
+
+| 配置项 | 作用 | 示例 |
+| :--- | :--- | :--- |
+| IP 地址 | 标识本机网络地址 | `192.168.200.130` |
+| 子网掩码/前缀 | 标识本机所在网段 | `255.255.255.0` 或 `/24` |
+| 网关 | 离开当前网段时经过的下一跳 | `192.168.200.2` |
+| DNS | 将域名解析为 IP 地址 | `8.8.8.8`、`223.5.5.5` |
+| 主机名 | 当前主机的名字 | `linux-node01` |
+| hosts 映射 | 本地域名/IP 映射 | `/etc/hosts` |
+
+虚拟机环境中常见网络模式：
+
+| 模式 | 特点 | 适合场景 |
+| :--- | :--- | :--- |
+| NAT | 虚拟机通过宿主机共享上网，外部通常不能直接访问虚拟机 | 学习、实验环境 |
+| 桥接 | 虚拟机和宿主机处于同一局域网，像一台独立机器 | 局域网内互相访问 |
+| 仅主机 | 虚拟机只能和宿主机通信，通常不能直接访问外网 | 隔离实验 |
+
+------
+
+## 第二章：查看网络配置
+
+### 1. 查看 IP 地址
+
+老版本常用 `ifconfig`，现代 Linux 更推荐 `ip` 命令。
+
+```bash
+# 推荐：查看所有网卡 IP
+ip addr
+ip a
+
+# 查看指定网卡
+ip addr show ens33
+
+# 旧命令，需要 net-tools 包
+ifconfig
+ifconfig ens33
+```
+
+常见网卡名称：
+
+| 名称 | 含义 |
+| :--- | :--- |
+| `lo` | 本地回环网卡，地址通常是 `127.0.0.1` |
+| `eth0` | 传统网卡命名 |
+| `ens33`、`ens160` | systemd/udev 的可预测网卡命名 |
+| `wlan0` | 无线网卡 |
+
+### 2. 查看网关和路由
+
+```bash
+# 推荐
+ip route
+ip route show
+
+# 查看默认网关
+ip route | grep default
+
+# 旧命令
+route -n
+netstat -rn
+```
+
+示例输出：
+
+```bash
+default via 192.168.200.2 dev ens33
+192.168.200.0/24 dev ens33 proto kernel scope link src 192.168.200.130
+```
+
+含义：
+
+| 字段 | 说明 |
+| :--- | :--- |
+| `default` | 默认路由，访问非本地网段时使用 |
+| `via` | 下一跳网关 |
+| `dev` | 走哪块网卡 |
+| `src` | 本机源 IP |
+
+### 3. 查看 DNS
+
+```bash
+cat /etc/resolv.conf
+```
+
+常见内容：
+
+```bash
+nameserver 192.168.200.2
+nameserver 8.8.8.8
+```
+
+在使用 NetworkManager、systemd-resolved 或容器环境时，`/etc/resolv.conf` 可能是自动生成的软链接，不建议随意手改。
+
+### 4. 查看主机名
+
+```bash
+hostname
+hostnamectl
+cat /etc/hostname
+```
+
+------
+
+## 第三章：测试网络连通性
+
+### 1. `ping` 测试主机连通性
+
+```bash
+ping 192.168.200.2
+ping www.baidu.com
+
+# 指定次数
+ping -c 4 www.baidu.com
+```
+
+排查思路：
+
+| 测试命令 | 目的 |
+| :--- | :--- |
+| `ping 127.0.0.1` | 测试本机 TCP/IP 协议栈 |
+| `ping 本机IP` | 测试本机网卡地址 |
+| `ping 网关IP` | 测试到网关是否通 |
+| `ping 公网IP` | 测试是否能出网 |
+| `ping 域名` | 测试 DNS 是否正常 |
+
+如果 `ping 8.8.8.8` 通，但 `ping www.baidu.com` 不通，通常是 DNS 问题。
+
+### 2. `traceroute` / `tracepath` 查看路径
+
+```bash
+traceroute www.baidu.com
+tracepath www.baidu.com
+```
+
+如果没有安装：
+
+```bash
+yum install -y traceroute
+apt install -y traceroute
+```
+
+### 3. `curl` 测试 HTTP 服务
+
+```bash
+curl -I https://www.baidu.com
+curl -v http://192.168.200.130:8080
+```
+
+### 4. `telnet` / `nc` 测试端口
+
+```bash
+# 测试 22 端口
+telnet 192.168.200.130 22
+
+# 推荐使用 nc
+nc -vz 192.168.200.130 22
+nc -vz www.baidu.com 443
+```
+
+------
+
+## 第四章：配置 Linux 网络
+
+### 1. 自动获取 IP：DHCP
+
+DHCP 会自动获取 IP、网关和 DNS。优点是简单，缺点是 IP 可能变化，不适合需要固定访问地址的服务器。
+
+CentOS/RHEL ifcfg 示例：
+
+```bash
+TYPE=Ethernet
+DEVICE=ens33
+ONBOOT=yes
+BOOTPROTO=dhcp
+```
+
+重启网络：
+
+```bash
+systemctl restart NetworkManager
+```
+
+老系统：
+
+```bash
+service network restart
+```
+
+### 2. 指定静态 IP：CentOS/RHEL ifcfg
+
+PDF 中使用的是修改 `/etc/sysconfig/network-scripts/ifcfg-ens33` 的方式。
+
+```bash
+vim /etc/sysconfig/network-scripts/ifcfg-ens33
+```
+
+示例：
+
+```bash
+TYPE=Ethernet
+DEVICE=ens33
+ONBOOT=yes
+BOOTPROTO=static
+IPADDR=192.168.200.130
+PREFIX=24
+GATEWAY=192.168.200.2
+DNS1=192.168.200.2
+DNS2=8.8.8.8
+```
+
+老写法也可能使用 `NETMASK`：
+
+```bash
+NETMASK=255.255.255.0
+```
+
+重启网络：
+
+```bash
+systemctl restart NetworkManager
+
+# 老版本 CentOS
+service network restart
+```
+
+注意：CentOS 8+、Rocky Linux、AlmaLinux 等系统默认由 NetworkManager 管理网络，直接改 ifcfg 文件后可能需要 `nmcli connection reload` 或重启 NetworkManager。
+
+### 3. 使用 `nmcli` 配置静态 IP
+
+`nmcli` 是 NetworkManager 的命令行工具，现代 RHEL/CentOS/Rocky/Alma 常用。
+
+查看连接：
+
+```bash
+nmcli connection show
+nmcli device status
+```
+
+配置静态 IP：
+
+```bash
+nmcli connection modify ens33 ipv4.method manual
+nmcli connection modify ens33 ipv4.addresses 192.168.200.130/24
+nmcli connection modify ens33 ipv4.gateway 192.168.200.2
+nmcli connection modify ens33 ipv4.dns "192.168.200.2 8.8.8.8"
+nmcli connection up ens33
+```
+
+改回 DHCP：
+
+```bash
+nmcli connection modify ens33 ipv4.method auto
+nmcli connection up ens33
+```
+
+### 4. Ubuntu 使用 netplan
+
+Ubuntu 18.04+ 常用 netplan 配置网络，配置文件通常在：
+
+```bash
+/etc/netplan/*.yaml
+```
+
+静态 IP 示例：
+
+```yaml
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    ens33:
+      dhcp4: no
+      addresses:
+        - 192.168.200.130/24
+      routes:
+        - to: default
+          via: 192.168.200.2
+      nameservers:
+        addresses:
+          - 192.168.200.2
+          - 8.8.8.8
+```
+
+应用配置：
+
+```bash
+netplan try
+netplan apply
+```
+
+`netplan try` 会提供回滚窗口，远程修改网络时更安全。
+
+------
+
+## 第五章：主机名与 hosts 映射
+
+### 1. 设置主机名
+
+查看主机名：
+
+```bash
+hostname
+hostnamectl
+```
+
+临时修改：
+
+```bash
+hostname linux-node01
+```
+
+永久修改：
+
+```bash
+hostnamectl set-hostname linux-node01
+```
+
+或编辑：
+
+```bash
+vim /etc/hostname
+```
+
+### 2. 设置 hosts 映射
+
+`hosts` 文件用于维护本地 IP 和主机名的映射。
+
+Linux：
+
+```bash
+vim /etc/hosts
+```
+
+示例：
+
+```bash
+192.168.200.130 linux-node01
+192.168.200.131 linux-node02
+```
+
+Windows：
+
+```bash
+C:\Windows\System32\drivers\etc\hosts
+```
+
+示例：
+
+```bash
+192.168.200.130 hspedu100
+```
+
+### 3. 主机名解析过程
+
+当访问 `www.baidu.com` 时，大致流程如下：
+
+1. 浏览器先查自己的 DNS 缓存。
+2. 操作系统再查本地 DNS 缓存。
+3. 检查本机 `hosts` 文件。
+4. 如果本地没有命中，再请求 DNS 服务器解析。
+5. 得到 IP 后，再建立网络连接。
+
+Linux 中可以用这些命令排查解析：
+
+```bash
+getent hosts www.baidu.com
+nslookup www.baidu.com
+dig www.baidu.com
+host www.baidu.com
+```
+
+Windows 中常见命令：
+
+```bash
+ipconfig /displaydns
+ipconfig /flushdns
+```
+
+------
+
+## 第六章：网络状态与端口排查
+
+### 1. 查看监听端口
+
+推荐使用 `ss`：
+
+```bash
+ss -tulnp
+```
+
+常用选项：
+
+| 选项 | 作用 |
+| :--- | :--- |
+| `-t` | TCP |
+| `-u` | UDP |
+| `-l` | 只看监听端口 |
+| `-n` | 不解析服务名，直接显示数字端口 |
+| `-p` | 显示进程信息 |
+
+旧命令：
+
+```bash
+netstat -tulnp
+netstat -anp | grep sshd
+```
+
+### 2. 查看某个端口被谁占用
+
+```bash
+ss -lntp | grep ':80'
+lsof -i :80
+fuser -n tcp 80
+```
+
+### 3. 查看网卡链路状态
+
+```bash
+ip link show
+ethtool ens33
+```
+
+### 4. 抓包排查
+
+```bash
+# 抓取 ens33 上的 ICMP 包
+tcpdump -i ens33 icmp
+
+# 抓取 80 端口
+tcpdump -i ens33 port 80
+
+# 保存到文件
+tcpdump -i ens33 -w /tmp/network.pcap
+```
+
+------
+
+## 第七章：防火墙端口管理
+
+生产环境一般不建议直接关闭防火墙，而是按需开放端口。
+
+### 1. firewalld
+
+查看状态：
+
+```bash
+systemctl status firewalld
+firewall-cmd --state
+```
+
+开放端口：
+
+```bash
+firewall-cmd --permanent --add-port=80/tcp
+firewall-cmd --reload
+```
+
+关闭端口：
+
+```bash
+firewall-cmd --permanent --remove-port=80/tcp
+firewall-cmd --reload
+```
+
+查询端口：
+
+```bash
+firewall-cmd --query-port=80/tcp
+firewall-cmd --list-ports
+firewall-cmd --list-all
+```
+
+### 2. ufw
+
+Ubuntu 常见：
+
+```bash
+ufw status
+ufw allow 22/tcp
+ufw allow 80/tcp
+ufw deny 3306/tcp
+ufw reload
+```
+
+------
+
+## 第八章：网络排错流程
+
+建议按从近到远的顺序排查：
+
+1. **网卡是否存在**
+
+```bash
+ip link show
+```
+
+2. **IP 是否正确**
+
+```bash
+ip addr show
+```
+
+3. **默认网关是否正确**
+
+```bash
+ip route
+```
+
+4. **能否 ping 通网关**
+
+```bash
+ping -c 4 192.168.200.2
+```
+
+5. **能否访问公网 IP**
+
+```bash
+ping -c 4 8.8.8.8
+```
+
+6. **DNS 是否正常**
+
+```bash
+ping -c 4 www.baidu.com
+nslookup www.baidu.com
+```
+
+7. **服务是否监听端口**
+
+```bash
+ss -tulnp
+```
+
+8. **防火墙是否放行**
+
+```bash
+firewall-cmd --list-all
+```
+
+9. **服务日志是否报错**
+
+```bash
+journalctl -u NetworkManager
+journalctl -u systemd-networkd
+dmesg | grep -i network
+```
+
+------
+
+## 🔧 网络配置常用命令汇总
+
+```bash
+# 查看地址、路由、链路
+ip addr
+ip route
+ip link show
+
+# 测试连通性
+ping -c 4 www.baidu.com
+tracepath www.baidu.com
+curl -I https://www.baidu.com
+nc -vz 192.168.200.130 22
+
+# DNS
+cat /etc/resolv.conf
+getent hosts www.baidu.com
+nslookup www.baidu.com
+
+# 主机名
+hostname
+hostnamectl set-hostname linux-node01
+
+# 端口
+ss -tulnp
+lsof -i :80
+
+# NetworkManager
+nmcli device status
+nmcli connection show
+systemctl restart NetworkManager
+```
+
+------
+
+## 📌 网络配置总结要点
+
+1. 网络配置核心是 IP、掩码、网关、DNS。
+2. `ip` 是现代 Linux 推荐命令，`ifconfig`、`route`、`netstat` 属于老工具。
+3. 服务器一般建议配置静态 IP，避免地址变化影响访问。
+4. 域名访问失败时，要区分“网络不通”和“DNS 解析失败”。
+5. 服务访问失败时，要同时检查服务监听、路由、防火墙和 SELinux。
+6. 远程修改网络配置前，优先使用 `netplan try` 或保留回滚方案，避免断开连接后无法恢复。
+
+# 进程管理
+
+## 第一章：进程管理概述
+
+在 Linux 中，每个正在执行的程序都称为一个进程。每个进程都会被分配一个唯一的进程号，也就是 PID。
+
+基本概念：
+
+| 概念 | 说明 |
+| :--- | :--- |
+| PID | 进程 ID，系统中进程的唯一标识 |
+| PPID | 父进程 ID |
+| 前台进程 | 占用当前终端，可以直接交互 |
+| 后台进程 | 不占用当前终端，通常在后台运行 |
+| 守护进程 | 长期在后台运行的服务进程，如 `sshd`、`mysqld` |
+| 僵尸进程 | 子进程已结束但父进程未回收状态，显示为 `Z` |
+
+常见进程状态：
+
+| 状态 | 含义 |
+| :--- | :--- |
+| `R` | Running，正在运行或可运行 |
+| `S` | Sleeping，可中断睡眠 |
+| `D` | Uninterruptible sleep，不可中断睡眠，常见于 I/O 等待 |
+| `T` | Stopped，已停止或被跟踪 |
+| `Z` | Zombie，僵尸进程 |
+| `s` | session leader，会话首进程 |
+| `+` | 前台进程组 |
+| `<` | 高优先级 |
+| `N` | 低优先级 |
+
+------
+
+## 第二章：查看进程
+
+### 1. `ps` 查看进程快照
+
+`ps` 用于查看某一时刻的进程状态。
+
+常用命令：
+
+```bash
+ps
+ps aux
+ps -ef
+ps aux | grep sshd
+ps -ef | grep sshd
+```
+
+`ps aux` 是 BSD 风格：
+
+| 字段 | 含义 |
+| :--- | :--- |
+| `USER` | 启动进程的用户 |
+| `PID` | 进程 ID |
+| `%CPU` | CPU 占用百分比 |
+| `%MEM` | 内存占用百分比 |
+| `VSZ` | 虚拟内存大小，单位 KB |
+| `RSS` | 实际物理内存大小，单位 KB |
+| `TTY` | 所属终端 |
+| `STAT` | 进程状态 |
+| `START` | 进程启动时间 |
+| `TIME` | 累计 CPU 时间 |
+| `COMMAND` | 启动命令 |
+
+`ps -ef` 是 System V 风格：
+
+| 字段 | 含义 |
+| :--- | :--- |
+| `UID` | 用户 ID 或用户名 |
+| `PID` | 进程 ID |
+| `PPID` | 父进程 ID |
+| `C` | CPU 调度相关因子 |
+| `STIME` | 启动时间 |
+| `TTY` | 终端 |
+| `TIME` | 累计 CPU 时间 |
+| `CMD` | 启动命令 |
+
+查看父子关系：
+
+```bash
+ps -ef | grep sshd
+ps -o pid,ppid,user,stat,cmd -p 进程号
+```
+
+### 2. `pgrep` / `pidof` 查找 PID
+
+```bash
+pgrep sshd
+pgrep -a sshd
+pidof sshd
+```
+
+按用户查找：
+
+```bash
+pgrep -u tom -a
+```
+
+### 3. `pstree` 查看进程树
+
+`pstree` 可以直观展示进程之间的父子关系。
+
+```bash
+pstree
+pstree -p      # 显示 PID
+pstree -u      # 显示所属用户
+pstree -ap     # 显示参数和 PID
+```
+
+### 4. `/proc` 查看进程信息
+
+`/proc` 是内核提供的虚拟文件系统，进程信息都可以在 `/proc/PID/` 下看到。
+
+```bash
+ls /proc/1
+cat /proc/1/status
+cat /proc/1/cmdline
+ls -l /proc/1/exe
+ls -l /proc/1/fd
+```
+
+常用文件：
+
+| 文件 | 作用 |
+| :--- | :--- |
+| `/proc/PID/status` | 进程状态、内存、线程等信息 |
+| `/proc/PID/cmdline` | 启动命令 |
+| `/proc/PID/environ` | 环境变量 |
+| `/proc/PID/fd/` | 打开的文件描述符 |
+| `/proc/PID/exe` | 可执行文件路径 |
+
+------
+
+## 第三章：终止进程
+
+### 1. `kill` 按 PID 终止进程
+
+基本语法：
+
+```bash
+kill [信号] PID
+```
+
+常用信号：
+
+| 信号 | 名称 | 作用 |
+| :--- | :--- | :--- |
+| `1` | `SIGHUP` | 重新加载配置或挂起 |
+| `2` | `SIGINT` | 中断，类似 `Ctrl+C` |
+| `9` | `SIGKILL` | 强制杀死，进程无法捕获 |
+| `15` | `SIGTERM` | 优雅终止，默认信号 |
+| `18` | `SIGCONT` | 继续运行 |
+| `19` | `SIGSTOP` | 暂停进程 |
+
+示例：
+
+```bash
+kill 11421
+kill -15 11421
+kill -9 11421
+```
+
+建议顺序：
+
+1. 先用 `kill PID` 或 `kill -15 PID`。
+2. 等待进程清理资源。
+3. 无法退出时，再使用 `kill -9 PID`。
+
+`kill -9` 会强制终止进程，可能导致临时文件、锁文件、事务状态没有正常清理，不应作为第一选择。
+
+### 2. `killall` 按名称终止进程
+
+```bash
+killall gedit
+killall -9 gedit
+```
+
+注意：`killall` 会匹配进程名，可能一次杀掉多个进程。生产环境使用前先确认：
+
+```bash
+pgrep -a gedit
+```
+
+### 3. `pkill` 按条件终止进程
+
+```bash
+pkill sshd
+pkill -u tom
+pkill -f "python app.py"
+```
+
+`-f` 会匹配完整命令行，能力更强，也更危险。
+
+### 4. 常见案例
+
+踢掉某个非法登录用户：
+
+```bash
+w
+ps -ef | grep pts/1
+kill 对应PID
+```
+
+终止并重启 sshd：
+
+```bash
+ps -ef | grep sshd
+kill sshd对应PID
+systemctl start sshd
+```
+
+强制杀掉某个终端：
+
+```bash
+ps -ef | grep bash
+kill -9 bash对应PID
+```
+
+------
+
+## 第四章：前台、后台与作业控制
+
+### 1. 后台执行
+
+```bash
+sleep 300 &
+```
+
+### 2. 查看当前终端作业
+
+```bash
+jobs
+jobs -l
+```
+
+### 3. 暂停和恢复
+
+| 操作 | 作用 |
+| :--- | :--- |
+| `Ctrl+C` | 中断前台进程 |
+| `Ctrl+Z` | 暂停前台进程 |
+| `bg %1` | 将作业 1 放到后台继续运行 |
+| `fg %1` | 将作业 1 调回前台 |
+
+示例：
+
+```bash
+sleep 300
+# 按 Ctrl+Z
+jobs -l
+bg %1
+fg %1
+```
+
+### 4. 退出终端后继续运行
+
+```bash
+nohup command > command.log 2>&1 &
+```
+
+更推荐的长期任务方式：
+
+1. 使用 `systemd` 管理服务。
+2. 使用 `tmux` / `screen` 保持会话。
+3. 使用进程管理器，如 `supervisord`、`pm2`。
+
+------
+
+## 第五章：服务管理
+
+服务本质上也是进程，只是通常作为后台守护进程运行，并监听某个端口或等待系统事件。例如 `sshd`、`mysqld`、`nginx`、`firewalld`。
+
+### 1. `service` 管理老式服务
+
+基本语法：
+
+```bash
+service 服务名 start
+service 服务名 stop
+service 服务名 restart
+service 服务名 reload
+service 服务名 status
+```
+
+示例：
+
+```bash
+service network status
+service network stop
+service network start
+```
+
+`service` 管理的脚本通常在：
+
+```bash
+/etc/init.d/
+```
+
+### 2. `systemctl` 管理 systemd 服务
+
+CentOS 7+、Ubuntu 16.04+ 等系统大多使用 systemd。
+
+```bash
+systemctl status sshd
+systemctl start sshd
+systemctl stop sshd
+systemctl restart sshd
+systemctl reload sshd
+```
+
+开机自启：
+
+```bash
+systemctl enable sshd
+systemctl disable sshd
+systemctl is-enabled sshd
+```
+
+查看服务：
+
+```bash
+systemctl list-units --type=service
+systemctl list-unit-files | grep sshd
+```
+
+查看服务文件位置：
+
+```bash
+systemctl cat sshd
+```
+
+常见 unit 文件目录：
+
+```bash
+/usr/lib/systemd/system/
+/lib/systemd/system/
+/etc/systemd/system/
+```
+
+### 3. 运行级别与 target
+
+传统 Linux 有 7 个运行级别：
+
+| 级别 | 含义 |
+| :--- | :--- |
+| `0` | 关机 |
+| `1` | 单用户模式，用于维护 |
+| `2` | 多用户，无 NFS |
+| `3` | 完全多用户，命令行模式 |
+| `4` | 保留 |
+| `5` | 图形界面模式 |
+| `6` | 重启 |
+
+CentOS 7+ 中使用 target 替代：
+
+| target | 类似运行级别 |
+| :--- | :--- |
+| `multi-user.target` | runlevel 3 |
+| `graphical.target` | runlevel 5 |
+| `rescue.target` | 单用户救援模式 |
+
+查看当前默认 target：
+
+```bash
+systemctl get-default
+```
+
+设置默认 target：
+
+```bash
+systemctl set-default multi-user.target
+systemctl set-default graphical.target
+```
+
+临时切换：
+
+```bash
+systemctl isolate multi-user.target
+systemctl isolate graphical.target
+```
+
+### 4. `chkconfig` 管理老式自启动
+
+CentOS 6 等老系统常用：
+
+```bash
+chkconfig --list
+chkconfig network --list
+chkconfig --level 3 network off
+chkconfig --level 3 network on
+```
+
+`chkconfig` 修改的是不同运行级别下服务是否自启动。**现代 systemd 系统优先使用 `systemctl enable/disable`。**
+
+------
+
+## 第六章：动态监控进程
+
+### 1. `top`
+
+`top` 可以动态查看系统负载和进程状态。
+
+```bash
+top
+top -d 10      # 每 10 秒刷新一次
+top -p PID     # 只看指定进程
+```
+
+常用交互操作：
+
+| 按键 | 作用 |
+| :--- | :--- |
+| `P` | 按 CPU 占用排序 |
+| `M` | 按内存占用排序 |
+| `u` | 只查看某个用户的进程 |
+| `k` | 终止指定 PID |
+| `r` | 调整 nice 值 |
+| `1` | 显示每个 CPU 核心 |
+| `q` | 退出 |
+
+PDF 中的案例：
+
+```bash
+# 监控特定用户
+top
+# 输入 u，再输入用户名
+
+# 终止指定进程
+top
+# 输入 k，再输入 PID
+
+# 每 10 秒刷新
+top -d 10
+```
+
+### 2. `htop`
+
+`htop` 是更友好的交互式工具，很多系统需要单独安装。
+
+```bash
+yum install -y htop
+apt install -y htop
+htop
+```
+
+### 3. 查看系统负载
+
+```bash
+uptime
+w
+cat /proc/loadavg
+```
+
+load average 表示系统平均负载，通常需要结合 CPU 核心数判断。
+
+```bash
+nproc
+lscpu
+```
+
+如果 4 核机器的 1 分钟负载长期高于 4，说明系统可能已经比较繁忙。
+
+### 4. 查看内存与 I/O
+
+```bash
+free -h
+vmstat 1 5
+iostat -x 1 5
+```
+
+如果没有 `iostat`：
+
+```bash
+yum install -y sysstat
+apt install -y sysstat
+```
+
+------
+
+## 第七章：进程与端口关系
+
+进程管理和网络排查经常一起使用，因为服务进程通常会监听端口。
+
+### 1. 查看监听端口和进程
+
+```bash
+ss -tulnp
+netstat -tulnp
+```
+
+PDF 中的示例：
+
+```bash
+netstat -anp | grep sshd
+```
+
+### 2. 查端口属于哪个进程
+
+```bash
+lsof -i :22
+ss -lntp | grep ':22'
+```
+
+### 3. 查进程打开了哪些文件
+
+```bash
+lsof -p PID
+ls -l /proc/PID/fd
+```
+
+------
+
+## 第八章：进程排错流程
+
+### 1. CPU 高
+
+```bash
+top
+ps aux --sort=-%cpu | head
+```
+
+定位后：
+
+```bash
+ps -fp PID
+pstree -ap PID
+lsof -p PID
+```
+
+### 2. 内存高
+
+```bash
+free -h
+ps aux --sort=-%mem | head
+```
+
+### 3. 僵尸进程
+
+```bash
+ps aux | awk '$8 ~ /Z/ {print}'
+```
+
+僵尸进程不能直接 `kill -9` 清理，因为它已经退出。应重点排查父进程是否没有正确回收子进程。
+
+```bash
+ps -o pid,ppid,stat,cmd -p 僵尸PID
+```
+
+必要时重启父进程。
+
+### 4. 服务启动失败
+
+```bash
+systemctl status 服务名
+journalctl -u 服务名
+journalctl -u 服务名 -n 100 --no-pager
+```
+
+常见原因：
+
+| 问题 | 排查方向 |
+| :--- | :--- |
+| 端口被占用 | `ss -tulnp`、`lsof -i :端口` |
+| 配置文件错误 | 查看服务日志，运行配置检查命令 |
+| 权限不足 | 文件权限、目录权限、运行用户 |
+| 依赖未启动 | `systemctl list-dependencies 服务名` |
+| 环境变量缺失 | systemd service 中显式设置 `Environment` |
+
+------
+
+## 🔧 进程管理常用命令汇总
+
+```bash
+# 查看进程
+ps aux
+ps -ef
+ps aux | grep sshd
+pgrep -a sshd
+pidof sshd
+pstree -p
+
+# 终止进程
+kill PID
+kill -15 PID
+kill -9 PID
+killall 进程名
+pkill -f "完整命令关键字"
+
+# 作业控制
+jobs -l
+bg %1
+fg %1
+nohup command > command.log 2>&1 &
+
+# 动态监控
+top
+top -d 10
+free -h
+uptime
+vmstat 1 5
+
+# 服务管理
+systemctl status sshd
+systemctl restart sshd
+systemctl enable sshd
+systemctl list-units --type=service
+journalctl -u sshd
+
+# 端口和进程
+ss -tulnp
+netstat -anp | grep sshd
+lsof -i :22
+lsof -p PID
+```
+
+------
+
+## 📌 进程管理总结要点
+
+1. 每个进程都有 PID，父子关系通过 PPID 关联。
+2. `ps` 查看快照，`top` 动态监控，`pstree` 查看进程树。
+3. `kill` 默认发送 `SIGTERM`，优先优雅终止；`kill -9` 是强制终止，谨慎使用。
+4. 服务本质也是后台进程，现代系统优先使用 `systemctl` 管理。
+5. 排查服务问题时，要结合进程、端口、日志、权限和配置文件一起看。
+6. 僵尸进程需要处理父进程，单纯杀僵尸 PID 通常无效。
+
+# 软件包管理
+
+## 第一章：软件包管理概述
+
+Linux 软件安装常见方式：
+
+| 方式 | 说明 | 常见系统 | 特点 |
+| :--- | :--- | :--- | :--- |
+| RPM 包 | Red Hat 系列二进制包格式 | RHEL、CentOS、Rocky、Alma、Fedora、SUSE | 安装快，但手工处理依赖麻烦 |
+| DEB 包 | Debian 系列二进制包格式 | Debian、Ubuntu | 安装快，配合 apt 管理依赖 |
+| YUM/DNF | RPM 系软件包管理器 | RHEL/CentOS/Rocky/Alma/Fedora | 自动下载、安装、升级和处理依赖 |
+| APT | DEB 系软件包管理器 | Debian/Ubuntu | 自动下载、安装、升级和处理依赖 |
+| 源码编译 | 下载源码后编译安装 | 各发行版 | 灵活，但步骤多、维护成本高 |
+| 脚本安装 | 官方或第三方安装脚本 | 各发行版 | 方便，但要注意安全来源 |
+
+日常优先级建议：
+
+1. 优先使用发行版官方包管理器：`dnf/yum/apt`。
+2. 官方仓库版本太旧时，再考虑第三方仓库、官方二进制包或源码编译。
+3. 生产环境避免随意执行来源不明的一键安装脚本。
+4. 重要服务器升级前先确认影响范围，并保留回滚方案。
+
+------
+
+## 第二章：RPM 包管理
+
+### 1. RPM 基本概念
+
+RPM 是 Red Hat Package Manager 的缩写，用于管理 `.rpm` 格式的软件包。它类似 Windows 中的安装包，但 RPM 本身不会自动从网络下载依赖，手工安装时容易遇到依赖问题。
+
+RPM 包名示例：
+
+```bash
+firefox-60.2.2-1.el7.centos.x86_64.rpm
+httpd-2.4.53-7.el9.x86_64.rpm
+```
+
+命名结构：
+
+| 部分 | 含义 |
+| :--- | :--- |
+| `firefox` | 软件包名 |
+| `60.2.2` | 软件版本 |
+| `1.el7.centos` | 发布次数和发行版标识 |
+| `x86_64` | CPU 架构 |
+| `.rpm` | RPM 包扩展名 |
+
+常见架构：
+
+| 架构 | 说明 |
+| :--- | :--- |
+| `x86_64` | 64 位 x86 系统 |
+| `i386` / `i686` | 32 位 x86 系统 |
+| `aarch64` | ARM 64 位 |
+| `noarch` | 与 CPU 架构无关 |
+
+### 2. RPM 查询
+
+查询是否安装：
+
+```bash
+rpm -q firefox
+```
+
+查询所有已安装包：
+
+```bash
+rpm -qa
+rpm -qa | grep firefox
+rpm -qa | more
+```
+
+查询包信息：
+
+```bash
+rpm -qi firefox
+```
+
+查询包安装了哪些文件：
+
+```bash
+rpm -ql firefox
+```
+
+查询某个系统文件属于哪个包：
+
+```bash
+rpm -qf /etc/passwd
+rpm -qf /usr/bin/ls
+```
+
+查询未安装 RPM 包的信息：
+
+```bash
+rpm -qip ./httpd-2.4.53-7.el9.x86_64.rpm
+rpm -qlp ./httpd-2.4.53-7.el9.x86_64.rpm
+```
+
+查询依赖：
+
+```bash
+rpm -qR firefox
+rpm -qRp ./package.rpm
+```
+
+### 3. RPM 安装
+
+基本语法：
+
+```bash
+rpm -ivh 包全名
+```
+
+选项说明：
+
+| 选项 | 作用 |
+| :--- | :--- |
+| `-i` | install，安装 |
+| `-v` | verbose，显示详细信息 |
+| `-h` | hash，显示进度条 |
+| `--test` | 只测试，不真正安装 |
+| `--nodeps` | 不检查依赖，不推荐 |
+| `--replacepkgs` | 重新安装已安装的包 |
+| `--replacefiles` | 覆盖已有文件 |
+| `--force` | 强制安装，谨慎使用 |
+
+示例：
+
+```bash
+rpm -ivh firefox-60.2.2-1.el7.centos.x86_64.rpm
+```
+
+先测试安装：
+
+```bash
+rpm -ivh --test package.rpm
+```
+
+### 4. RPM 升级
+
+```bash
+rpm -Uvh package.rpm    # 升级；如果未安装则安装
+rpm -Fvh package.rpm    # 仅升级已安装的软件包
+```
+
+### 5. RPM 卸载
+
+基本语法：
+
+```bash
+rpm -e 包名
+```
+
+示例：
+
+```bash
+rpm -e firefox
+```
+
+如果存在依赖，会报错。可以使用 `--nodeps` 强制卸载：
+
+```bash
+rpm -e --nodeps 包名
+```
+
+不推荐强制卸载，因为依赖该包的程序可能无法运行。生产环境优先使用 `dnf remove` 或 `yum remove`。
+
+### 6. RPM 校验
+
+检查已安装文件是否被修改：
+
+```bash
+rpm -V 包名
+rpm -Vf /etc/ssh/sshd_config
+rpm -Va
+```
+
+校验输出示例：
+
+```bash
+S.5....T.  c /etc/httpd/conf/httpd.conf
+```
+
+常见标记：
+
+| 标记 | 含义 |
+| :--- | :--- |
+| `S` | 文件大小变化 |
+| `M` | 权限或文件类型变化 |
+| `5` | 摘要校验变化，通常表示内容变化 |
+| `D` | 设备号变化 |
+| `L` | 链接路径变化 |
+| `U` | 所有者变化 |
+| `G` | 属组变化 |
+| `T` | 修改时间变化 |
+| `c` | 配置文件 |
+
+### 7. RPM GPG 签名
+
+导入 GPG 公钥：
+
+```bash
+rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9
+rpm -qa | grep gpg-pubkey
+```
+
+检查 RPM 包签名：
+
+```bash
+rpm --checksig package.rpm
+```
+
+------
+
+## 第三章：YUM 与 DNF
+
+### 1. YUM/DNF 基本概念
+
+YUM 是 RPM 系系统的前端包管理器，可以从配置好的软件源下载 RPM 包并自动处理依赖。DNF 是 YUM 的新一代实现，CentOS 8、Rocky Linux、AlmaLinux、Fedora 等系统中更常用。
+
+简单理解：
+
+| 工具 | 作用 |
+| :--- | :--- |
+| `rpm` | 管理本地 RPM 包，不擅长自动处理依赖 |
+| `yum` | 从仓库安装 RPM 包，自动处理依赖 |
+| `dnf` | 新一代 YUM，命令基本兼容 |
+
+很多系统中 `yum` 只是 `dnf` 的兼容入口。
+
+### 2. 仓库配置
+
+YUM/DNF 仓库配置目录：
+
+```bash
+/etc/yum.repos.d/
+```
+
+仓库文件扩展名：
+
+```bash
+*.repo
+```
+
+示例：
+
+```ini
+[baseos]
+name=Rocky Linux BaseOS
+baseurl=https://download.rockylinux.org/pub/rocky/9/BaseOS/x86_64/os/
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9
+```
+
+常见字段：
+
+| 字段 | 说明 |
+| :--- | :--- |
+| `[baseos]` | 仓库 ID |
+| `name` | 仓库描述 |
+| `baseurl` | 软件源地址 |
+| `mirrorlist` | 镜像列表地址 |
+| `enabled` | 是否启用，`1` 启用，`0` 禁用 |
+| `gpgcheck` | 是否检查 GPG 签名 |
+| `gpgkey` | GPG 公钥位置 |
+
+### 3. 本地光盘源
+
+挂载光盘：
+
+```bash
+mkdir -p /mnt/cdrom
+mount /dev/sr0 /mnt/cdrom
+```
+
+备份原有 repo：
+
+```bash
+cd /etc/yum.repos.d/
+mkdir -p backup
+mv *.repo backup/
+```
+
+创建本地源：
+
+```bash
+vim local.repo
+```
+
+示例：
+
+```ini
+[local-BaseOS]
+name=local BaseOS
+baseurl=file:///mnt/cdrom/BaseOS
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9
+
+[local-AppStream]
+name=local AppStream
+baseurl=file:///mnt/cdrom/AppStream
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9
+```
+
+刷新缓存：
+
+```bash
+dnf clean all
+dnf makecache
+```
+
+### 4. 查询软件包
+
+```bash
+dnf list
+dnf list installed
+dnf list available
+dnf list nginx
+dnf search nginx
+dnf info nginx
+```
+
+查询某个命令或文件由哪个包提供：
+
+```bash
+dnf provides */ifconfig
+dnf provides /usr/bin/ss
+dnf whatprovides */semanage
+```
+
+YUM 写法类似：
+
+```bash
+yum list | grep firefox
+yum search nginx
+yum provides */ifconfig
+```
+
+### 5. 安装软件包
+
+```bash
+dnf install nginx
+dnf -y install nginx
+yum install firefox
+```
+
+安装本地 RPM，并自动处理依赖：
+
+```bash
+dnf install ./package.rpm
+yum localinstall ./package.rpm
+```
+
+只下载不安装：
+
+```bash
+dnf download nginx
+dnf download --resolve nginx
+```
+
+如果没有 `dnf download`：
+
+```bash
+dnf install -y dnf-plugins-core
+```
+
+### 6. 升级软件包
+
+查看可升级包：
+
+```bash
+dnf check-update
+yum check-update
+```
+
+升级指定包：
+
+```bash
+dnf update nginx
+yum update nginx
+```
+
+升级全部包：
+
+```bash
+dnf update
+yum update
+```
+
+生产环境不要随意全量升级，尤其是数据库、内核、基础库等关键组件。
+
+### 7. 卸载软件包
+
+```bash
+dnf remove nginx
+yum remove nginx
+```
+
+自动移除不再需要的依赖：
+
+```bash
+dnf autoremove
+```
+
+### 8. 软件组管理
+
+```bash
+dnf grouplist
+dnf groupinfo "Development Tools"
+dnf groupinstall "Development Tools"
+dnf groupremove "Development Tools"
+```
+
+常见用途：安装编译环境。
+
+```bash
+dnf groupinstall -y "Development Tools"
+dnf install -y gcc gcc-c++ make
+```
+
+### 9. 缓存管理
+
+清理缓存：
+
+```bash
+dnf clean all
+yum clean all
+```
+
+创建缓存：
+
+```bash
+dnf makecache
+yum makecache
+```
+
+查看缓存目录：
+
+```bash
+ls /var/cache/dnf
+ls /var/cache/yum
+```
+
+保留下载的 RPM 包，可在 `/etc/dnf/dnf.conf` 中配置：
+
+```ini
+keepcache=True
+```
+
+### 10. 历史记录和回滚
+
+查看历史：
+
+```bash
+dnf history
+yum history
+```
+
+查看某次事务：
+
+```bash
+dnf history info 12
+```
+
+撤销某次安装或升级：
+
+```bash
+dnf history undo 12
+yum history undo 12
+```
+
+回滚能力取决于仓库中是否仍然保留旧版本包。
+
+### 11. 常见第三方仓库
+
+RHEL 系常见补充仓库：
+
+```bash
+dnf install -y epel-release
+```
+
+EPEL 提供许多官方基础仓库没有的软件，如 `htop`、`iftop`、`ncdu` 等。
+
+查看仓库：
+
+```bash
+dnf repolist
+dnf repolist all
+```
+
+临时启用或禁用仓库：
+
+```bash
+dnf --enablerepo=epel install htop
+dnf --disablerepo=epel update
+```
+
+------
+
+## 第四章：APT 包管理
+
+### 1. APT 基本概念
+
+APT 是 Debian/Ubuntu 系统常用的软件包管理工具，底层管理 `.deb` 包，能自动处理依赖。
+
+常见工具关系：
+
+| 工具 | 作用 |
+| :--- | :--- |
+| `dpkg` | 本地安装、查询、卸载 `.deb` 包，不自动处理依赖 |
+| `apt` | 日常交互式包管理，推荐使用 |
+| `apt-get` | 脚本中更稳定，兼容性好 |
+| `apt-cache` | 查询软件包信息 |
+
+### 2. 更新软件源索引
+
+APT 安装前通常先更新本地索引：
+
+```bash
+sudo apt update
+```
+
+注意：`apt update` 只更新软件包列表，不升级软件。
+
+### 3. 安装软件
+
+```bash
+sudo apt install vim
+sudo apt install -y vim
+sudo apt-get install -y openssh-server
+```
+
+安装本地 `.deb` 包：
+
+```bash
+sudo apt install ./package.deb
+```
+
+使用 `dpkg` 安装本地包：
+
+```bash
+sudo dpkg -i package.deb
+sudo apt -f install
+```
+
+`apt -f install` 用于修复依赖。
+
+### 4. 查询软件
+
+搜索包：
+
+```bash
+apt search nginx
+apt-cache search nginx
+```
+
+查看包信息：
+
+```bash
+apt show vim
+apt-cache show vim
+```
+
+查看已安装包：
+
+```bash
+apt list --installed
+dpkg -l
+dpkg -l | grep vim
+```
+
+查看文件属于哪个包：
+
+```bash
+dpkg -S /usr/bin/vim
+```
+
+查看包安装了哪些文件：
+
+```bash
+dpkg -L vim
+```
+
+如果要查询“某个未安装命令由哪个包提供”，安装 `apt-file`：
+
+```bash
+sudo apt install -y apt-file
+sudo apt-file update
+apt-file search bin/ifconfig
+```
+
+### 5. 升级软件
+
+查看可升级包：
+
+```bash
+apt list --upgradable
+```
+
+升级已安装软件：
+
+```bash
+sudo apt upgrade
+```
+
+允许安装/删除依赖以完成更大范围升级：
+
+```bash
+sudo apt full-upgrade
+```
+
+脚本中常用：
+
+```bash
+sudo apt-get update
+sudo apt-get upgrade -y
+```
+
+### 6. 卸载软件
+
+只卸载软件，保留配置：
+
+```bash
+sudo apt remove vim
+```
+
+卸载软件并删除配置：
+
+```bash
+sudo apt purge vim
+```
+
+清理不再需要的依赖：
+
+```bash
+sudo apt autoremove
+```
+
+清理缓存：
+
+```bash
+sudo apt clean
+sudo apt autoclean
+```
+
+### 7. APT 源配置
+
+传统源配置：
+
+```bash
+/etc/apt/sources.list
+/etc/apt/sources.list.d/*.list
+```
+
+Ubuntu 新版本也可能使用 deb822 格式：
+
+```bash
+/etc/apt/sources.list.d/*.sources
+```
+
+修改源后刷新：
+
+```bash
+sudo apt update
+```
+
+查看当前源：
+
+```bash
+grep -R "^[^#]" /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null
+```
+
+### 8. PPA 和第三方源
+
+Ubuntu 可使用 PPA：
+
+```bash
+sudo add-apt-repository ppa:example/ppa
+sudo apt update
+```
+
+删除 PPA：
+
+```bash
+sudo add-apt-repository --remove ppa:example/ppa
+```
+
+生产环境谨慎使用第三方源，避免包版本覆盖系统关键组件。
+
+### 9. 锁文件问题
+
+如果同时运行多个 apt 进程，可能看到锁错误。
+
+先确认是否有 apt 正在运行：
+
+```bash
+ps -ef | grep -E 'apt|dpkg'
+```
+
+不要直接删除锁文件，除非确认没有相关进程。异常中断后可尝试修复：
+
+```bash
+sudo dpkg --configure -a
+sudo apt -f install
+```
+
+------
+
+## 第五章：dpkg 基础
+
+`dpkg` 是 Debian/Ubuntu 的底层包管理工具，类似 RPM 系里的 `rpm`。
+
+安装本地包：
+
+```bash
+sudo dpkg -i package.deb
+```
+
+卸载包，保留配置：
+
+```bash
+sudo dpkg -r 包名
+```
+
+卸载包并删除配置：
+
+```bash
+sudo dpkg -P 包名
+```
+
+查询包是否安装：
+
+```bash
+dpkg -l | grep nginx
+dpkg -s nginx
+```
+
+查询包文件列表：
+
+```bash
+dpkg -L nginx
+```
+
+查询文件属于哪个包：
+
+```bash
+dpkg -S /usr/sbin/nginx
+```
+
+修复未完成配置：
+
+```bash
+sudo dpkg --configure -a
+```
+
+------
+
+## 第六章：包管理器对比
+
+| 任务 | RHEL/CentOS/Rocky | Debian/Ubuntu |
+| :--- | :--- | :--- |
+| 更新索引 | `dnf makecache` | `apt update` |
+| 搜索包 | `dnf search nginx` | `apt search nginx` |
+| 安装包 | `dnf install nginx` | `apt install nginx` |
+| 卸载包 | `dnf remove nginx` | `apt remove nginx` |
+| 删除配置 | 通常需手工处理 | `apt purge nginx` |
+| 升级包 | `dnf update nginx` | `apt install --only-upgrade nginx` |
+| 全量升级 | `dnf update` | `apt upgrade` |
+| 查包信息 | `dnf info nginx` | `apt show nginx` |
+| 查已安装包 | `rpm -qa` | `dpkg -l` |
+| 查文件归属 | `rpm -qf /path/file` | `dpkg -S /path/file` |
+| 查命令由谁提供 | `dnf provides */cmd` | `apt-file search bin/cmd` |
+| 清缓存 | `dnf clean all` | `apt clean` |
+
+------
+
+## 第七章：日常使用示例
+
+### 1. 安装网络工具
+
+RHEL 系：
+
+```bash
+dnf install -y net-tools bind-utils traceroute tcpdump lsof
+```
+
+Debian/Ubuntu：
+
+```bash
+sudo apt update
+sudo apt install -y net-tools dnsutils traceroute tcpdump lsof
+```
+
+### 2. 安装编译环境
+
+RHEL 系：
+
+```bash
+dnf groupinstall -y "Development Tools"
+dnf install -y gcc gcc-c++ make cmake
+```
+
+Debian/Ubuntu：
+
+```bash
+sudo apt update
+sudo apt install -y build-essential gcc g++ make cmake
+```
+
+### 3. 安装 SSH 服务
+
+RHEL 系：
+
+```bash
+dnf install -y openssh-server
+systemctl enable --now sshd
+systemctl status sshd
+```
+
+Debian/Ubuntu：
+
+```bash
+sudo apt install -y openssh-server
+sudo systemctl enable --now ssh
+sudo systemctl status ssh
+```
+
+### 4. 安装 Nginx
+
+RHEL 系：
+
+```bash
+dnf install -y nginx
+systemctl enable --now nginx
+firewall-cmd --permanent --add-service=http
+firewall-cmd --reload
+```
+
+Debian/Ubuntu：
+
+```bash
+sudo apt install -y nginx
+sudo systemctl enable --now nginx
+```
+
+### 5. 查找 `ifconfig` 属于哪个包
+
+RHEL 系：
+
+```bash
+dnf provides */ifconfig
+dnf install -y net-tools
+```
+
+Debian/Ubuntu：
+
+```bash
+sudo apt install -y apt-file
+sudo apt-file update
+apt-file search bin/ifconfig
+sudo apt install -y net-tools
+```
+
+### 6. 离线安装 RPM 包
+
+在有网机器下载包及依赖：
+
+```bash
+dnf download --resolve nginx
+```
+
+拷贝到离线机器后安装：
+
+```bash
+dnf install ./*.rpm
+```
+
+如果完全没有仓库，可尝试：
+
+```bash
+rpm -Uvh ./*.rpm
+```
+
+### 7. 离线安装 DEB 包
+
+下载包：
+
+```bash
+apt download nginx
+```
+
+仅下载依赖会更复杂，常见做法是使用同版本系统准备离线包，或搭建内部 APT 仓库。
+
+安装本地包：
+
+```bash
+sudo apt install ./*.deb
+```
+
+### 8. 固定包版本
+
+DNF 查看版本：
+
+```bash
+dnf list --showduplicates nginx
+```
+
+安装指定版本：
+
+```bash
+dnf install nginx-版本号
+```
+
+APT 查看版本：
+
+```bash
+apt-cache policy nginx
+```
+
+安装指定版本：
+
+```bash
+sudo apt install nginx=版本号
+```
+
+APT 阻止自动升级：
+
+```bash
+sudo apt-mark hold nginx
+sudo apt-mark unhold nginx
+```
+
+------
+
+## 第八章：常见问题排查
+
+### 1. 仓库不可用
+
+现象：
+
+```bash
+Cannot find a valid baseurl
+Failed to download metadata
+Temporary failure resolving
+```
+
+排查：
+
+```bash
+ping -c 4 8.8.8.8
+ping -c 4 mirrors.aliyun.com
+cat /etc/resolv.conf
+ip route
+dnf repolist
+```
+
+常见原因：
+
+1. 网络不通。
+2. DNS 不通。
+3. repo 地址错误或系统版本不匹配。
+4. 代理、防火墙、证书问题。
+
+### 2. GPG 签名错误
+
+RHEL 系：
+
+```bash
+rpm --import /path/to/RPM-GPG-KEY
+dnf clean all
+dnf makecache
+```
+
+APT 系：
+
+```bash
+sudo apt update
+```
+
+如果第三方源缺少 key，应按官方文档添加 key。不要随意关闭签名校验。
+
+### 3. 依赖冲突
+
+RHEL 系：
+
+```bash
+dnf repoquery --requires 包名
+dnf repoquery --whatrequires 包名
+dnf history
+```
+
+APT 系：
+
+```bash
+apt-cache depends 包名
+apt-cache rdepends 包名
+sudo apt -f install
+sudo dpkg --configure -a
+```
+
+### 4. 包管理器被锁
+
+DNF/YUM：
+
+```bash
+ps -ef | grep -E 'dnf|yum|rpm'
+```
+
+APT：
+
+```bash
+ps -ef | grep -E 'apt|dpkg'
+sudo dpkg --configure -a
+```
+
+确认没有相关进程后再处理锁文件。不要在另一个安装任务还没结束时强行删除锁。
+
+### 5. 配置文件被覆盖
+
+RPM 通常会保护已修改配置，可能生成：
+
+```bash
+.rpmnew
+.rpmsave
+```
+
+查找：
+
+```bash
+find /etc -name "*.rpmnew" -o -name "*.rpmsave"
+```
+
+APT 也可能在升级时询问是否保留配置。生产环境升级前应备份 `/etc` 下关键配置。
+
+------
+
+## 第九章：最佳实践
+
+1. **优先使用官方仓库**
+   - 稳定、安全、依赖关系清晰。
+2. **谨慎混用多个第三方源**
+   - 容易引发依赖冲突和基础库版本漂移。
+3. **生产环境升级前先测试**
+   - 尤其是数据库、Web 服务、语言运行时、内核。
+4. **不要轻易使用 `--nodeps` 和 `--force`**
+   - 可能破坏依赖关系。
+5. **定期清理缓存**
+   - 避免 `/var` 空间被包缓存占满。
+6. **保留关键软件版本记录**
+   - 排查问题和回滚时很有用。
+7. **内网环境建议搭建内部仓库**
+   - 可控、稳定、速度快，也方便安全审计。
+8. **安装前先查询包来源和内容**
+   - `dnf info`、`apt show`、`rpm -qlp`、`dpkg -c` 都很有用。
+
+------
+
+## 🔧 软件包管理命令速查
+
+### RPM
+
+```bash
+rpm -qa | grep 包名
+rpm -q 包名
+rpm -qi 包名
+rpm -ql 包名
+rpm -qf /path/file
+rpm -ivh package.rpm
+rpm -Uvh package.rpm
+rpm -e 包名
+rpm -V 包名
+```
+
+### YUM/DNF
+
+```bash
+dnf search 关键字
+dnf info 包名
+dnf provides */命令
+dnf install -y 包名
+dnf remove 包名
+dnf update 包名
+dnf update
+dnf clean all
+dnf makecache
+dnf history
+dnf repolist
+```
+
+### APT
+
+```bash
+sudo apt update
+apt search 关键字
+apt show 包名
+sudo apt install -y 包名
+sudo apt remove 包名
+sudo apt purge 包名
+sudo apt upgrade
+sudo apt autoremove
+sudo apt clean
+apt list --installed
+apt list --upgradable
+```
+
+### dpkg
+
+```bash
+dpkg -l | grep 包名
+dpkg -L 包名
+dpkg -S /path/file
+sudo dpkg -i package.deb
+sudo dpkg -r 包名
+sudo dpkg -P 包名
+sudo dpkg --configure -a
+```
+
+------
+
+## 📌 软件包管理总结要点
+
+1. RPM/DEB 是包格式，YUM/DNF/APT 是更高级的包管理器。
+2. `rpm` 和 `dpkg` 更适合本地包查询和底层操作，不擅长自动解决依赖。
+3. RHEL 系日常优先用 `dnf` 或 `yum`，Debian/Ubuntu 日常优先用 `apt`。
+4. 安装失败先看网络、DNS、仓库配置、GPG key、依赖冲突和锁文件。
+5. 生产环境升级前要评估影响，避免无计划全量升级。
+6. `--nodeps`、`--force`、关闭 GPG 校验都属于高风险操作，不应作为常规手段。
+
+# Shell编程
+
+## 第一章：Shell 编程概述
+
+Shell 是用户和 Linux 内核之间的命令解释器。用户输入命令后，Shell 负责解析命令、展开变量、处理管道和重定向，然后调用系统程序完成操作。
+
+学习 Shell 编程的常见目的：
+
+1. **系统管理自动化**
+   - 批量创建用户、清理日志、备份文件、巡检服务器。
+2. **服务维护**
+   - 启停服务、检查进程、检查端口、收集异常日志。
+3. **定时任务**
+   - 配合 `crontab` 实现数据库备份、数据同步、监控告警。
+4. **批量处理文本**
+   - 结合 `grep`、`awk`、`sed`、`sort`、`uniq` 处理日志和数据。
+5. **部署脚本**
+   - 编译、打包、发布、回滚。
+
+常见 Shell：
+
+| Shell | 说明 |
+| :--- | :--- |
+| `sh` | 传统 Bourne Shell，兼容性强 |
+| `bash` | Linux 中最常见，功能丰富 |
+| `zsh` | 交互体验好，常用于个人终端 |
+| `dash` | 轻量，常作为 Ubuntu `/bin/sh` |
+
+查看当前 Shell：
+
+```bash
+echo $SHELL
+```
+
+查看系统支持的 Shell：
+
+```bash
+cat /etc/shells
+```
+
+------
+
+## 第二章：脚本基础
+
+### 1. 脚本格式要求
+
+Shell 脚本一般以解释器声明开头：
+
+```bash
+#!/bin/bash
+```
+
+示例：`hello.sh`
+
+```bash
+#!/bin/bash
+echo "hello, world"
+```
+
+### 2. 执行脚本的方式
+
+方式 1：赋予执行权限后直接运行。
+
+```bash
+chmod +x hello.sh
+./hello.sh
+
+# 或使用绝对路径
+/root/shcode/hello.sh
+```
+
+方式 2：通过解释器运行，不要求脚本有执行权限。
+
+```bash
+bash hello.sh
+sh hello.sh
+```
+
+方式 3：在当前 Shell 中执行。
+
+```bash
+source hello.sh
+. hello.sh
+```
+
+区别：
+
+| 方式 | 是否新开子 Shell | 变量是否影响当前 Shell |
+| :--- | :--- | :--- |
+| `./hello.sh` | 是 | 否 |
+| `bash hello.sh` | 是 | 否 |
+| `source hello.sh` | 否 | 是 |
+
+修改环境变量文件后，通常使用 `source` 立即生效：
+
+```bash
+source /etc/profile
+source ~/.bashrc
+```
+
+### 3. 注释
+
+单行注释：
+
+```bash
+# 这是注释
+```
+
+多行注释常用写法：
+
+```bash
+: <<'EOF'
+这里面的内容不会执行
+可以写多行说明
+EOF
+```
+
+### 4. 常用调试方式
+
+```bash
+# 检查语法，不执行
+bash -n script.sh
+
+# 显示执行过程
+bash -x script.sh
+
+# 在脚本内部开启调试
+set -x
+命令
+set +x
+```
+
+------
+
+## 第三章：变量
+
+### 1. 变量定义和使用
+
+基本语法：
+
+```bash
+变量名=值
+echo "$变量名"
+```
+
+注意事项：
+
+1. 等号两侧不能有空格。
+2. 变量名可以由字母、数字、下划线组成，但不能以数字开头。
+3. 变量名建议有意义，普通变量可小写，环境变量通常大写。
+4. 使用变量时建议加双引号，避免空格和通配符导致意外展开。
+
+示例：
+
+```bash
+#!/bin/bash
+
+name="tom"
+age=18
+
+echo "name=$name"
+echo "age=$age"
+```
+
+错误写法：
+
+```bash
+name = tom     # 错误，等号两边不能有空格
+5name=tom      # 错误，变量不能以数字开头
+```
+
+### 2. 撤销变量和只读变量
+
+```bash
+A=100
+echo "$A"
+
+unset A
+echo "$A"
+
+readonly B=2
+echo "$B"
+# unset B 会失败
+```
+
+### 3. 命令替换
+
+把命令执行结果赋值给变量：
+
+```bash
+now=$(date)
+files=$(ls /etc | wc -l)
+
+echo "now=$now"
+echo "files=$files"
+```
+
+反引号也可以实现命令替换，但推荐 `$(...)`：
+
+```bash
+now=`date`
+```
+
+### 4. 环境变量
+
+常见系统变量：
+
+| 变量 | 含义 |
+| :--- | :--- |
+| `$HOME` | 当前用户家目录 |
+| `$PWD` | 当前目录 |
+| `$SHELL` | 当前登录 Shell |
+| `$USER` | 当前用户名 |
+| `$PATH` | 命令搜索路径 |
+| `$LANG` | 当前语言环境 |
+
+查看变量：
+
+```bash
+echo "$HOME"
+echo "$PWD"
+set      # 查看当前 Shell 所有变量
+env      # 查看环境变量
+```
+
+导出环境变量：
+
+```bash
+export TOMCAT_HOME=/usr/local/tomcat
+echo "$TOMCAT_HOME"
+```
+
+写入 `/etc/profile` 或 `~/.bashrc`：
+
+```bash
+export TOMCAT_HOME=/usr/local/tomcat
+export PATH=$PATH:$TOMCAT_HOME/bin
+```
+
+立即生效：
+
+```bash
+source /etc/profile
+```
+
+### 5. 变量默认值
+
+常用写法：
+
+| 写法 | 含义 |
+| :--- | :--- |
+| `${var:-default}` | 如果 `var` 为空或未定义，使用默认值，不修改 var |
+| `${var:=default}` | 如果 `var` 为空或未定义，赋默认值给 var |
+| `${var:?message}` | 如果 `var` 为空或未定义，报错并退出 |
+| `${var:+value}` | 如果 `var` 有值，则返回 value |
+
+示例：
+
+```bash
+#!/bin/bash
+
+name=${1:-guest}
+echo "hello $name"
+
+backup_dir=${BACKUP_DIR:=/data/backup}
+echo "backup_dir=$backup_dir"
+
+: "${DB_HOST:?DB_HOST is required}"
+```
+
+------
+
+## 第四章：参数变量
+
+### 1. 位置参数
+
+脚本可以接收命令行参数：
+
+```bash
+./myshell.sh 100 200
+```
+
+脚本中读取：
+
+| 变量 | 含义 |
+| :--- | :--- |
+| `$0` | 脚本名 |
+| `$1` | 第 1 个参数 |
+| `$2` | 第 2 个参数 |
+| `${10}` | 第 10 个参数，10 以上必须加 `{}` |
+| `$#` | 参数个数 |
+| `$*` | 所有参数，整体看待 |
+| `$@` | 所有参数，逐个看待 |
+
+示例：`position.sh`
+
+```bash
+#!/bin/bash
+
+echo "脚本名: $0"
+echo "第1个参数: $1"
+echo "第2个参数: $2"
+echo "参数个数: $#"
+echo "所有参数: $*"
+```
+
+执行：
+
+```bash
+bash position.sh 100 200
+```
+
+### 2. `$*` 和 `$@` 的区别
+
+在双引号中区别明显：
+
+```bash
+#!/bin/bash
+
+echo '--- "$*" ---'
+for arg in "$*"; do
+  echo "$arg"
+done
+
+echo '--- "$@" ---'
+for arg in "$@"; do
+  echo "$arg"
+done
+```
+
+执行：
+
+```bash
+bash test.sh a "b c" d
+```
+
+`"$*"` 会把所有参数当作一个整体；`"$@"` 会保留每个参数的独立性。写脚本时遍历参数通常使用 `"$@"`。
+
+### 3. 预定义变量
+
+| 变量 | 含义 |
+| :--- | :--- |
+| `$$` | 当前 Shell 进程 PID |
+| `$!` | 最近一个后台进程 PID |
+| `$?` | 上一条命令退出状态，`0` 表示成功 |
+| `$0` | 当前脚本名 |
+| `$-` | 当前 Shell 选项 |
+
+示例：
+
+```bash
+#!/bin/bash
+
+echo "当前进程 PID=$$"
+
+sleep 60 &
+echo "后台进程 PID=$!"
+
+ls /not-exist
+echo "上一条命令退出码=$?"
+```
+
+### 4. 参数检查模板
+
+```bash
+#!/bin/bash
+
+if [ "$#" -ne 2 ]; then
+  echo "用法: $0 <源目录> <目标目录>"
+  exit 1
+fi
+
+src=$1
+dst=$2
+
+echo "src=$src"
+echo "dst=$dst"
+```
+
+------
+
+## 第五章：引号与命令展开
+
+### 1. 单引号、双引号、无引号
+
+| 写法 | 特点 |
+| :--- | :--- |
+| `'...'` | 强引用，不解析变量和命令 |
+| `"..."` | 弱引用，会解析变量和命令，保留空格 |
+| 无引号 | 会发生变量展开、单词拆分、通配符展开 |
+
+示例：
+
+```bash
+name="tom"
+
+echo '$name'     # 输出 $name
+echo "$name"     # 输出 tom
+echo $name       # 输出 tom，但不推荐省略引号
+```
+
+为什么变量建议加双引号：
+
+```bash
+file="my file.txt"
+
+# 推荐
+rm -- "$file"
+
+# 不推荐，可能被拆成 my 和 file.txt
+rm -- $file
+```
+
+### 2. 大括号区分变量边界
+
+```bash
+name="tom"
+echo "${name}_log"
+```
+
+如果写成：
+
+```bash
+echo "$name_log"
+```
+
+Shell 会寻找变量 `name_log`，而不是 `name`。
+
+### 3. 通配符
+
+```bash
+ls *.log
+ls file?.txt
+ls [abc].txt
+```
+
+危险命令中要特别注意变量是否为空：
+
+```bash
+dir=""
+rm -rf "$dir"/*
+```
+
+这种写法如果变量为空会变成删除 `/*`，非常危险。应先检查：
+
+```bash
+if [ -n "$dir" ] && [ -d "$dir" ]; then
+  rm -rf "$dir"/*
+fi
+```
+
+------
+
+## 第六章：运算符
+
+### 1. 整数运算
+
+推荐写法：
+
+```bash
+a=2
+b=3
+
+sum=$((a + b))
+mul=$(((a + b) * 4))
+
+echo "$sum"
+echo "$mul"
+```
+
+老写法：
+
+```bash
+sum=$[$a + $b]
+```
+
+`expr` 写法，运算符两侧必须有空格：
+
+```bash
+sum=$(expr 2 + 3)
+mul=$(expr "$sum" \* 4)
+```
+
+### 2. 自增自减
+
+```bash
+i=0
+((i++))
+((i += 2))
+echo "$i"
+```
+
+### 3. 浮点数运算
+
+Shell 原生只支持整数运算，浮点数通常使用 `bc` 或 `awk`：
+
+```bash
+echo "scale=2; 10 / 3" | bc
+awk 'BEGIN { printf "%.2f\n", 10 / 3 }'
+```
+
+### 4. 命令行参数求和
+
+```bash
+#!/bin/bash
+
+if [ "$#" -ne 2 ]; then
+  echo "用法: $0 num1 num2"
+  exit 1
+fi
+
+sum=$(($1 + $2))
+echo "sum=$sum"
+```
+
+------
+
+## 第七章：条件判断
+
+### 1. `test` 和 `[ ]`
+
+基本语法：
+
+```bash
+[ 条件表达式 ]
+```
+
+注意：`[` 后面和 `]` 前面必须有空格。
+
+示例：
+
+```bash
+[ "ok" = "ok" ]
+echo "$?"
+
+[ 23 -ge 22 ] && echo "OK" || echo "not OK"
+```
+
+### 2. 字符串判断
+
+| 表达式 | 含义 |
+| :--- | :--- |
+| `[ "$a" = "$b" ]` | 字符串相等 |
+| `[ "$a" != "$b" ]` | 字符串不等 |
+| `[ -z "$a" ]` | 字符串为空 |
+| `[ -n "$a" ]` | 字符串非空 |
+
+示例：
+
+```bash
+name=""
+
+if [ -z "$name" ]; then
+  echo "name is empty"
+fi
+```
+
+### 3. 整数判断
+
+| 表达式 | 含义 |
+| :--- | :--- |
+| `-lt` | 小于 |
+| `-le` | 小于等于 |
+| `-eq` | 等于 |
+| `-gt` | 大于 |
+| `-ge` | 大于等于 |
+| `-ne` | 不等于 |
+
+示例：
+
+```bash
+score=80
+
+if [ "$score" -ge 60 ]; then
+  echo "及格"
+else
+  echo "不及格"
+fi
+```
+
+### 4. 文件判断
+
+| 表达式 | 含义 |
+| :--- | :--- |
+| `-e file` | 文件或目录存在 |
+| `-f file` | 普通文件存在 |
+| `-d dir` | 目录存在 |
+| `-r file` | 可读 |
+| `-w file` | 可写 |
+| `-x file` | 可执行 |
+| `-s file` | 文件存在且大小大于 0 |
+| `file1 -nt file2` | file1 比 file2 新 |
+| `file1 -ot file2` | file1 比 file2 旧 |
+
+示例：
+
+```bash
+file="/root/shcode/aaa.txt"
+
+if [ -f "$file" ]; then
+  echo "$file exists"
+else
+  echo "$file not found"
+fi
+```
+
+### 5. `[[ ]]` 增强判断
+
+`[[ ]]` 是 bash 的增强条件判断，支持模式匹配和更安全的字符串处理。
+
+```bash
+name="app.log"
+
+if [[ "$name" == *.log ]]; then
+  echo "log file"
+fi
+```
+
+正则匹配：
+
+```bash
+num="123"
+
+if [[ "$num" =~ ^[0-9]+$ ]]; then
+  echo "number"
+fi
+```
+
+### 6. 多条件判断
+
+```bash
+age=20
+name="tom"
+
+if [ "$age" -ge 18 ] && [ "$name" = "tom" ]; then
+  echo "matched"
+fi
+
+if [[ "$age" -ge 18 && "$name" == "tom" ]]; then
+  echo "matched"
+fi
+```
+
+------
+
+## 第八章：流程控制
+
+### 1. `if` 判断
+
+单分支：
+
+```bash
+if [ 条件 ]; then
+  命令
+fi
+```
+
+双分支：
+
+```bash
+if [ 条件 ]; then
+  命令1
+else
+  命令2
+fi
+```
+
+多分支：
+
+```bash
+if [ 条件1 ]; then
+  命令1
+elif [ 条件2 ]; then
+  命令2
+else
+  命令3
+fi
+```
+
+示例：判断成绩。
+
+```bash
+#!/bin/bash
+
+score=${1:-0}
+
+if [ "$score" -ge 90 ]; then
+  echo "优秀"
+elif [ "$score" -ge 60 ]; then
+  echo "及格"
+else
+  echo "不及格"
+fi
+```
+
+### 2. `case` 分支
+
+适合处理固定选项。
+
+```bash
+#!/bin/bash
+
+case "$1" in
+  start)
+    echo "starting..."
+    ;;
+  stop)
+    echo "stopping..."
+    ;;
+  restart)
+    echo "restarting..."
+    ;;
+  *)
+    echo "用法: $0 {start|stop|restart}"
+    exit 1
+    ;;
+esac
+```
+
+PDF 示例：数字对应星期。
+
+```bash
+#!/bin/bash
+
+case "$1" in
+  1)
+    echo "周一"
+    ;;
+  2)
+    echo "周二"
+    ;;
+  *)
+    echo "other"
+    ;;
+esac
+```
+
+### 3. `for in` 循环
+
+遍历固定列表：
+
+```bash
+for name in tom jack alice; do
+  echo "$name"
+done
+```
+
+遍历脚本参数：
+
+```bash
+for arg in "$@"; do
+  echo "arg=$arg"
+done
+```
+
+遍历文件：
+
+```bash
+for file in /var/log/*.log; do
+  [ -e "$file" ] || continue
+  echo "$file"
+done
+```
+
+### 4. C 风格 `for` 循环
+
+```bash
+sum=0
+
+for ((i = 1; i <= 100; i++)); do
+  sum=$((sum + i))
+done
+
+echo "sum=$sum"
+```
+
+### 5. `while` 循环
+
+统计 `1` 到 `n` 的和：
+
+```bash
+#!/bin/bash
+
+n=${1:-100}
+sum=0
+i=1
+
+while [ "$i" -le "$n" ]; do
+  sum=$((sum + i))
+  i=$((i + 1))
+done
+
+echo "sum=$sum"
+```
+
+### 6. 逐行读取文件
+
+推荐写法：
+
+```bash
+while IFS= read -r line; do
+  echo "line=$line"
+done < file.txt
+```
+
+忽略空行和注释：
+
+```bash
+while IFS= read -r line; do
+  [[ -z "$line" || "$line" =~ ^# ]] && continue
+  echo "$line"
+done < config.txt
+```
+
+### 7. `break` 和 `continue`
+
+```bash
+for i in {1..10}; do
+  if [ "$i" -eq 3 ]; then
+    continue
+  fi
+
+  if [ "$i" -eq 8 ]; then
+    break
+  fi
+
+  echo "$i"
+done
+```
+
+------
+
+## 第九章：读取输入
+
+### 1. `read` 基本使用
+
+```bash
+read name
+echo "name=$name"
+```
+
+带提示：
+
+```bash
+read -p "请输入用户名: " username
+echo "username=$username"
+```
+
+限时输入：
+
+```bash
+read -t 10 -p "请输入 NUM: " num
+echo "num=$num"
+```
+
+静默输入密码：
+
+```bash
+read -s -p "请输入密码: " password
+echo
+echo "password length=${#password}"
+```
+
+### 2. 确认操作
+
+```bash
+read -p "确认删除? [y/N] " answer
+
+case "$answer" in
+  y|Y|yes|YES)
+    echo "delete..."
+    ;;
+  *)
+    echo "cancel"
+    ;;
+esac
+```
+
+------
+
+## 第十章：数组和字符串处理
+
+### 1. 数组
+
+```bash
+arr=(tom jack alice)
+
+echo "${arr[0]}"
+echo "${arr[1]}"
+echo "${arr[@]}"
+echo "${#arr[@]}"
+```
+
+遍历数组：
+
+```bash
+for item in "${arr[@]}"; do
+  echo "$item"
+done
+```
+
+追加元素：
+
+```bash
+arr+=("bob")
+```
+
+### 2. 关联数组
+
+bash 4+ 支持关联数组：
+
+```bash
+declare -A user_age
+user_age[tom]=18
+user_age[jack]=20
+
+echo "${user_age[tom]}"
+
+for key in "${!user_age[@]}"; do
+  echo "$key=${user_age[$key]}"
+done
+```
+
+### 3. 字符串长度和截取
+
+```bash
+s="hello world"
+
+echo "${#s}"        # 长度
+echo "${s:0:5}"     # hello
+echo "${s:6}"       # world
+```
+
+### 4. 字符串替换
+
+```bash
+s="a-b-c"
+
+echo "${s/-/_}"     # 替换第一个 -
+echo "${s//-/_}"    # 替换所有 -
+```
+
+### 5. 去前缀和后缀
+
+```bash
+file="/data/log/app.log"
+
+echo "${file##*/}"      # app.log，最长前缀删除
+echo "${file%.*}"       # /data/log/app，最短后缀删除
+echo "${file%.log}"     # /data/log/app
+```
+
+------
+
+## 第十一章：函数
+
+### 1. 系统函数
+
+`basename`：获取路径中的文件名。
+
+```bash
+basename /home/aaa/test.txt
+basename /home/aaa/test.txt .txt
+```
+
+`dirname`：获取路径中的目录部分。
+
+```bash
+dirname /home/aaa/test.txt
+```
+
+### 2. 自定义函数
+
+基本格式：
+
+```bash
+function 函数名() {
+  命令
+}
+```
+
+也可以写成：
+
+```bash
+函数名() {
+  命令
+}
+```
+
+示例：求和。
+
+```bash
+#!/bin/bash
+
+get_sum() {
+  local n1=$1
+  local n2=$2
+  echo $((n1 + n2))
+}
+
+result=$(get_sum 10 20)
+echo "result=$result"
+```
+
+### 3. 函数返回值
+
+Shell 函数的 `return` 通常用于返回退出码，范围是 `0-255`，不是返回字符串。
+
+```bash
+is_file() {
+  local file=$1
+
+  if [ -f "$file" ]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+if is_file "/etc/passwd"; then
+  echo "exists"
+fi
+```
+
+如果要返回字符串，使用 `echo`，再用命令替换接收：
+
+```bash
+get_date() {
+  date +%F
+}
+
+today=$(get_date)
+echo "$today"
+```
+
+### 4. 常用日志函数
+
+```bash
+log_info() {
+  echo "$(date '+%F %T') [INFO] $*"
+}
+
+log_error() {
+  echo "$(date '+%F %T') [ERROR] $*" >&2
+}
+
+log_info "start backup"
+log_error "backup failed"
+```
+
+------
+
+## 第十二章：重定向、管道和退出码
+
+### 1. 标准输入输出
+
+| 编号 | 名称 | 说明 |
+| :--- | :--- | :--- |
+| `0` | stdin | 标准输入 |
+| `1` | stdout | 标准输出 |
+| `2` | stderr | 标准错误 |
+
+### 2. 重定向
+
+```bash
+command > file        # 覆盖标准输出
+command >> file       # 追加标准输出
+command 2> err.log    # 错误输出
+command > all.log 2>&1
+command &> all.log    # bash 支持
+```
+
+丢弃输出：
+
+```bash
+command > /dev/null 2>&1
+```
+
+### 3. 管道
+
+```bash
+ps aux | grep nginx
+cat access.log | grep "ERROR" | wc -l
+```
+
+更推荐减少无用 `cat`：
+
+```bash
+grep "ERROR" access.log | wc -l
+```
+
+### 4. 退出码
+
+```bash
+command
+echo "$?"
+```
+
+常见约定：
+
+| 退出码 | 含义 |
+| :--- | :--- |
+| `0` | 成功 |
+| 非 0 | 失败 |
+| `1` | 通用错误 |
+| `2` | 参数或用法错误 |
+| `126` | 命令不可执行 |
+| `127` | 命令不存在 |
+| `130` | 被 `Ctrl+C` 中断 |
+
+### 5. `set -euo pipefail`
+
+常见脚本增强开关：
+
+```bash
+set -euo pipefail
+```
+
+含义：
+
+| 选项 | 作用 |
+| :--- | :--- |
+| `set -e` | 命令失败时退出 |
+| `set -u` | 使用未定义变量时报错 |
+| `set -o pipefail` | 管道中任一命令失败，整体失败 |
+
+注意：`set -e` 不是万能的，在 `if`、`while`、`&&`、`||`、管道等场景要理解清楚。复杂脚本中建议关键命令显式判断。
+
+```bash
+if ! cp "$src" "$dst"; then
+  echo "copy failed" >&2
+  exit 1
+fi
+```
+
+------
+
+## 第十三章：常用脚本模板
+
+### 1. 基础脚本模板
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+log() {
+  echo "$(date '+%F %T') $*"
+}
+
+main() {
+  log "start"
+  # 在这里写主要逻辑
+  log "done"
+}
+
+main "$@"
+```
+
+### 2. 参数解析模板
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+usage() {
+  echo "用法: $0 -f <file> -d <dir>"
+}
+
+file=""
+dir=""
+
+while getopts ":f:d:h" opt; do
+  case "$opt" in
+    f)
+      file=$OPTARG
+      ;;
+    d)
+      dir=$OPTARG
+      ;;
+    h)
+      usage
+      exit 0
+      ;;
+    :)
+      echo "选项 -$OPTARG 需要参数" >&2
+      usage
+      exit 2
+      ;;
+    \?)
+      echo "未知选项: -$OPTARG" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+if [ -z "$file" ] || [ -z "$dir" ]; then
+  usage
+  exit 2
+fi
+
+echo "file=$file"
+echo "dir=$dir"
+```
+
+### 3. 检查命令是否存在
+
+```bash
+require_cmd() {
+  local cmd=$1
+
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "缺少命令: $cmd" >&2
+    exit 1
+  fi
+}
+
+require_cmd curl
+require_cmd tar
+```
+
+### 4. 检查 root 权限
+
+```bash
+if [ "$(id -u)" -ne 0 ]; then
+  echo "请使用 root 执行" >&2
+  exit 1
+fi
+```
+
+### 5. 加锁防止重复执行
+
+```bash
+#!/bin/bash
+
+lock_file=/tmp/my_job.lock
+
+exec 9>"$lock_file"
+if ! flock -n 9; then
+  echo "脚本已经在运行"
+  exit 1
+fi
+
+echo "start job"
+sleep 10
+echo "done"
+```
+
+配合 `crontab` 很常用：
+
+```bash
+*/5 * * * * /usr/bin/flock -n /tmp/job.lock /usr/local/bin/job.sh >> /var/log/job.log 2>&1
+```
+
+------
+
+## 第十四章：常用实战示例
+
+### 1. 检查文件是否存在
+
+```bash
+#!/bin/bash
+
+file=$1
+
+if [ -z "$file" ]; then
+  echo "用法: $0 <file>"
+  exit 2
+fi
+
+if [ -f "$file" ]; then
+  echo "$file 存在"
+else
+  echo "$file 不存在"
+fi
+```
+
+### 2. 统计文本数字之和并排序
+
+文件 `t3.txt` 内容是一列无序数字：
+
+```bash
+#!/bin/bash
+
+file=${1:-t3.txt}
+
+if [ ! -f "$file" ]; then
+  echo "文件不存在: $file" >&2
+  exit 1
+fi
+
+sort -n "$file"
+awk '{sum += $1} END {print "sum=" sum}' "$file"
+```
+
+### 3. 批量创建用户
+
+```bash
+#!/bin/bash
+
+user_file=${1:-users.txt}
+
+if [ "$(id -u)" -ne 0 ]; then
+  echo "请使用 root 执行" >&2
+  exit 1
+fi
+
+while IFS= read -r user; do
+  [ -z "$user" ] && continue
+  [[ "$user" =~ ^# ]] && continue
+
+  if id "$user" >/dev/null 2>&1; then
+    echo "用户已存在: $user"
+  else
+    useradd "$user"
+    echo "已创建用户: $user"
+  fi
+done < "$user_file"
+```
+
+### 4. 批量检查主机是否可达
+
+```bash
+#!/bin/bash
+
+hosts=${1:-hosts.txt}
+
+while IFS= read -r host; do
+  [ -z "$host" ] && continue
+  [[ "$host" =~ ^# ]] && continue
+
+  if ping -c 1 -W 1 "$host" >/dev/null 2>&1; then
+    echo "$host OK"
+  else
+    echo "$host FAIL"
+  fi
+done < "$hosts"
+```
+
+### 5. 检查服务是否运行
+
+```bash
+#!/bin/bash
+
+service_name=${1:-sshd}
+
+if systemctl is-active --quiet "$service_name"; then
+  echo "$service_name is running"
+else
+  echo "$service_name is not running"
+  systemctl start "$service_name"
+fi
+```
+
+### 6. 检查端口是否监听
+
+```bash
+#!/bin/bash
+
+port=${1:-80}
+
+if ss -lnt | awk '{print $4}' | grep -q ":${port}$"; then
+  echo "port $port is listening"
+else
+  echo "port $port is not listening"
+fi
+```
+
+### 7. 清理 7 天前日志
+
+```bash
+#!/bin/bash
+
+log_dir=${1:-/var/log/myapp}
+days=${2:-7}
+
+if [ ! -d "$log_dir" ]; then
+  echo "目录不存在: $log_dir" >&2
+  exit 1
+fi
+
+find "$log_dir" -type f -name "*.log" -mtime +"$days" -print -delete
+```
+
+### 8. 打包备份目录
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+src=${1:-/etc}
+backup_dir=${2:-/data/backup}
+date_str=$(date +%F_%H%M%S)
+name=$(basename "$src")
+
+mkdir -p "$backup_dir"
+
+tar -czf "$backup_dir/${name}_${date_str}.tar.gz" "$src"
+echo "backup saved: $backup_dir/${name}_${date_str}.tar.gz"
+```
+
+### 9. 数据库备份综合案例
+
+需求：
+
+1. 每天凌晨 2:30 备份数据库 `hspedu` 到 `/data/backup/db`。
+2. 备份开始和结束要有提示。
+3. 备份文件以时间命名，并打包成 `.tar.gz`。
+4. 删除 10 天前的备份文件。
+
+脚本：`/usr/local/sbin/mysql_db_backup.sh`
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+BACKUP=/data/backup/db
+DATETIME=$(date +%Y-%m-%d_%H%M%S)
+HOST=localhost
+DB_USER=root
+DATABASE=hspedu
+
+log() {
+  echo "$(date '+%F %T') $*"
+}
+
+log "开始备份数据库: $DATABASE"
+
+mkdir -p "$BACKUP/$DATETIME"
+
+# 推荐把密码写入 /root/.my.cnf，避免出现在脚本和进程参数中
+mysqldump -u"$DB_USER" --host="$HOST" -q -R --databases "$DATABASE" \
+  | gzip > "$BACKUP/$DATETIME/$DATETIME.sql.gz"
+
+cd "$BACKUP"
+tar -czf "$DATETIME.tar.gz" "$DATETIME"
+rm -rf "$BACKUP/$DATETIME"
+
+find "$BACKUP" -type f -name "*.tar.gz" -mtime +10 -print -delete
+
+log "备份数据库成功: $BACKUP/$DATETIME.tar.gz"
+```
+
+数据库密码推荐放到 `/root/.my.cnf`：
+
+```ini
+[client]
+user=root
+password=你的密码
+```
+
+设置权限：
+
+```bash
+chmod 600 /root/.my.cnf
+chmod +x /usr/local/sbin/mysql_db_backup.sh
+```
+
+加入定时任务：
+
+```bash
+crontab -e
+```
+
+```bash
+30 2 * * * /usr/local/sbin/mysql_db_backup.sh >> /var/log/mysql_db_backup.log 2>&1
+```
+
+### 10. 发布前备份并重启服务
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+app_dir=/opt/myapp
+backup_dir=/data/backup/myapp
+pkg=$1
+service_name=myapp
+date_str=$(date +%F_%H%M%S)
+
+if [ ! -f "$pkg" ]; then
+  echo "包不存在: $pkg" >&2
+  exit 1
+fi
+
+mkdir -p "$backup_dir"
+tar -czf "$backup_dir/myapp_$date_str.tar.gz" "$app_dir"
+
+systemctl stop "$service_name"
+tar -xzf "$pkg" -C "$app_dir"
+systemctl start "$service_name"
+systemctl status "$service_name" --no-pager
+```
+
+------
+
+## 第十五章：Shell 脚本安全与最佳实践
+
+1. **变量使用双引号**
+   - 推荐 `"$var"`，避免空格、通配符导致误操作。
+2. **危险命令前做检查**
+   - `rm -rf`、`chmod -R`、`chown -R` 前必须确认变量非空、目录存在。
+3. **使用绝对路径**
+   - 定时任务和 systemd 环境变量较少，脚本中尽量使用绝对路径。
+4. **关键步骤写日志**
+   - 方便排查定时任务和后台任务。
+5. **参数必须校验**
+   - 参数数量、文件存在性、权限、数字格式都要检查。
+6. **密码不要写死在脚本里**
+   - 使用配置文件、环境变量、密钥管理系统。
+7. **脚本要可重复执行**
+   - 尽量做到幂等，重复执行不产生脏数据。
+8. **先手动执行，再放入 crontab**
+   - 避免环境变量、路径、权限问题。
+9. **复杂逻辑不要硬写 Shell**
+   - Shell 适合胶水脚本和系统命令编排；复杂数据结构、复杂业务逻辑可考虑 Python/Go。
+
+危险写法和推荐写法：
+
+```bash
+# 危险：dir 为空时风险极高
+rm -rf $dir/*
+
+# 推荐
+if [ -n "${dir:-}" ] && [ -d "$dir" ]; then
+  rm -rf "$dir"/*
+else
+  echo "invalid dir: ${dir:-empty}" >&2
+  exit 1
+fi
+```
+
+------
+
+## 🔧 Shell 常用命令与语法速查
+
+```bash
+# 执行和调试
+chmod +x script.sh
+./script.sh
+bash script.sh
+bash -n script.sh
+bash -x script.sh
+
+# 变量
+name="tom"
+echo "$name"
+unset name
+readonly PI=3
+today=$(date +%F)
+
+# 参数
+echo "$0"
+echo "$1"
+echo "$#"
+for arg in "$@"; do echo "$arg"; done
+
+# 判断
+[ -f "$file" ]
+[ -d "$dir" ]
+[ -n "$str" ]
+[ "$a" -gt "$b" ]
+[[ "$file" == *.log ]]
+
+# 循环
+for i in {1..10}; do echo "$i"; done
+while IFS= read -r line; do echo "$line"; done < file.txt
+
+# 函数
+my_func() {
+  local name=$1
+  echo "hello $name"
+}
+my_func tom
+
+# 重定向
+cmd > out.log 2> err.log
+cmd >> all.log 2>&1
+cmd >/dev/null 2>&1
+```
+
+------
+
+## 📌 Shell 编程总结要点
+
+1. Shell 适合系统管理、任务编排、批量处理和自动化运维。
+2. 脚本通常以 `#!/bin/bash` 开头，执行前需要确认权限和解释器。
+3. 变量赋值等号两侧不能有空格，使用变量时优先加双引号。
+4. 参数处理常用 `$1`、`$#`、`"$@"`，退出码用 `$?` 判断。
+5. 条件判断中 `[` 和 `]` 两侧必须有空格，bash 中复杂判断可用 `[[ ]]`。
+6. 循环读文件时推荐 `while IFS= read -r line`。
+7. 函数返回字符串用 `echo`，返回成功失败用 `return`。
+8. 生产脚本要重视日志、参数校验、错误处理、加锁和敏感信息保护。
