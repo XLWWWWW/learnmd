@@ -487,7 +487,7 @@ linux中使用已经建立的空目录作为挂载点
 >   ```bash
 >   # 快速返回家目录
 >   cd ~
->                     
+>                       
 >   # 访问其他用户家目录
 >   cd ~alice  # 进入alice用户的家目录
 >   ```
@@ -518,13 +518,13 @@ linux中使用已经建立的空目录作为挂载点
 >   ```bash
 >   # 查看当前主机名
 >   hostname
->                     
+>                       
 >   # 查看完整主机名
 >   hostname -f
->                     
+>                       
 >   # 临时修改主机名
 >   hostname myserver
->                     
+>                       
 >   # 永久修改主机名（CentOS/RHEL）
 >   hostnamectl set-hostname myserver.example.com
 >   ```
@@ -554,17 +554,17 @@ linux中使用已经建立的空目录作为挂载点
 >   ```bash
 >   # 查看当前的PS1设置
 >   echo $PS1
->                     
+>                       
 >   # 常见的PS1格式（CentOS为例）
 >   [\u@\h \W]\$
 >   # \u: 用户名
 >   # \h: 主机名
 >   # \W: 当前目录（基名）
 >   # \$: 提示符（#或$）
->                     
+>                       
 >   # 修改PS1变量（临时）
 >   PS1="[\u@\H \w]\$ "  # \H: 完整主机名，\w: 完整路径
->                     
+>                       
 >   # 永久修改（添加到~/.bashrc）
 >   echo 'export PS1="[\u@\h \w]\$ "' >> ~/.bashrc
 >   source ~/.bashrc
@@ -8533,6 +8533,1083 @@ lsof -p PID
 5. 排查服务问题时，要结合进程、端口、日志、权限和配置文件一起看。
 6. 僵尸进程需要处理父进程，单纯杀僵尸 PID 通常无效。
 
+# 日志管理
+
+## 第一章：日志管理概述
+
+日志是 Linux 系统中非常重要的信息来源，用来记录系统、服务、用户、安全、内核、定时任务等事件。遇到服务异常、登录失败、系统重启、磁盘满、网络不通等问题时，第一反应通常应该是查日志。
+
+日志常见用途：
+
+1. **故障排查**
+   - 服务启动失败、程序报错、端口监听异常。
+2. **安全审计**
+   - 登录成功/失败、sudo 操作、SSH 暴力破解、权限变更。
+3. **运行分析**
+   - 访问量、错误率、慢请求、资源异常。
+4. **合规留存**
+   - 保留一段时间的关键系统和业务日志。
+5. **攻击溯源**
+   - 分析攻击来源 IP、时间线、执行过的命令和访问路径。
+
+Linux 常见日志体系：
+
+| 体系 | 说明 | 常见工具 |
+| :--- | :--- | :--- |
+| 文本日志 | 大多保存在 `/var/log/` 下，可用 `cat/less/grep/tail` 查看 | `rsyslog`、应用程序 |
+| systemd 日志 | systemd-journald 采集的结构化日志 | `journalctl` |
+| 内核日志 | 内核启动、驱动、硬件等信息 | `dmesg`、`journalctl -k` |
+| 二进制登录日志 | 登录、失败登录、最后登录等记录 | `last`、`lastb`、`lastlog` |
+| 应用日志 | Nginx、MySQL、Java、业务程序日志 | 应用自定义 |
+
+------
+
+## 第二章：常用日志文件
+
+`/var/log/` 是系统日志的主要保存目录。
+
+常见日志文件：
+
+| 日志路径 | 说明 | 常见系统 |
+| :--- | :--- | :--- |
+| `/var/log/messages` | 系统综合日志，记录内核、服务、系统信息 | CentOS/RHEL |
+| `/var/log/syslog` | 系统综合日志 | Debian/Ubuntu |
+| `/var/log/secure` | 认证、安全、SSH、sudo 等日志 | CentOS/RHEL |
+| `/var/log/auth.log` | 认证、安全、SSH、sudo 等日志 | Debian/Ubuntu |
+| `/var/log/cron` | 定时任务日志 | CentOS/RHEL |
+| `/var/log/maillog` | 邮件服务日志 | CentOS/RHEL |
+| `/var/log/mail.log` | 邮件服务日志 | Debian/Ubuntu |
+| `/var/log/boot.log` | 系统启动日志 | 部分 RHEL 系 |
+| `/var/log/dmesg` | 内核环形缓冲区启动日志 | 部分发行版 |
+| `/var/log/wtmp` | 历史登录记录，二进制文件 | 通用 |
+| `/var/log/btmp` | 失败登录记录，二进制文件 | 通用 |
+| `/var/log/lastlog` | 每个用户最后登录记录，二进制文件 | 通用 |
+
+服务日志示例：
+
+| 服务 | 常见日志 |
+| :--- | :--- |
+| Nginx | `/var/log/nginx/access.log`、`/var/log/nginx/error.log` |
+| Apache | `/var/log/httpd/access_log`、`/var/log/httpd/error_log` |
+| MySQL | `/var/log/mysqld.log`、`/var/log/mysql/error.log` |
+| Redis | `/var/log/redis/redis.log` |
+| Docker | `journalctl -u docker` 或容器日志 |
+| Kubernetes | `kubectl logs`、`journalctl -u kubelet` |
+
+登录相关二进制日志不能直接用 `cat` 看，应该使用专用命令：
+
+```bash
+w              # 当前登录用户，读取 /var/run/utmp
+who            # 当前登录用户
+last           # 历史登录，读取 /var/log/wtmp
+lastb          # 失败登录，读取 /var/log/btmp
+lastlog        # 所有用户最后登录时间，读取 /var/log/lastlog
+```
+
+------
+
+## 第三章：查看日志的常用命令
+
+### 1. 实时查看
+
+```bash
+tail -f /var/log/messages
+tail -f /var/log/syslog
+tail -f /var/log/secure
+tail -f /var/log/auth.log
+```
+
+查看最后 100 行并持续跟踪：
+
+```bash
+tail -n 100 -f /var/log/messages
+```
+
+跟踪多个文件：
+
+```bash
+tail -f /var/log/nginx/access.log /var/log/nginx/error.log
+```
+
+### 2. 分页查看
+
+```bash
+less /var/log/messages
+less /var/log/secure
+```
+
+`less` 中常用操作：
+
+| 操作 | 含义 |
+| :--- | :--- |
+| `/关键字` | 向下搜索 |
+| `?关键字` | 向上搜索 |
+| `n` | 下一个匹配 |
+| `N` | 上一个匹配 |
+| `G` | 跳到文件末尾 |
+| `g` | 跳到文件开头 |
+| `q` | 退出 |
+
+### 3. 过滤日志
+
+```bash
+grep "Failed password" /var/log/secure
+grep "error" /var/log/messages
+grep -i "error" /var/log/messages
+grep -n "sshd" /var/log/secure
+```
+
+排除无关行：
+
+```bash
+grep "sshd" /var/log/secure | grep -v "Accepted"
+```
+
+上下文查看：
+
+```bash
+grep -C 3 "panic" /var/log/messages
+grep -A 5 -B 5 "ERROR" app.log
+```
+
+### 4. 按时间查看文本日志
+
+文本日志格式不完全统一，通常结合 `grep`：
+
+```bash
+grep "Jun 21" /var/log/messages
+grep "Jun 21 10:" /var/log/messages
+grep "2026-06-21" app.log
+```
+
+如果日志是标准 ISO 时间格式，可以用 `awk` 做范围过滤：
+
+```bash
+awk '$1 >= "2026-06-21" && $1 <= "2026-06-22" {print}' app.log
+```
+
+### 5. 压缩日志查看
+
+轮转后的日志常常是 `.gz`：
+
+```bash
+zcat /var/log/messages-20260621.gz
+zless /var/log/messages-20260621.gz
+zgrep "error" /var/log/messages-*.gz
+```
+
+------
+
+## 第四章：rsyslog 日志服务
+
+### 1. rsyslogd 基本概念
+
+CentOS 7 及很多传统 Linux 系统使用 `rsyslogd` 作为系统日志服务。CentOS 6 时代常见的是 `syslogd`，`rsyslogd` 功能更强，同时兼容传统 syslog 格式。
+
+检查服务是否运行：
+
+```bash
+ps aux | grep "rsyslog" | grep -v "grep"
+systemctl status rsyslog
+```
+
+查看是否开机自启：
+
+```bash
+systemctl list-unit-files | grep rsyslog
+systemctl is-enabled rsyslog
+```
+
+启动和重启：
+
+```bash
+systemctl start rsyslog
+systemctl restart rsyslog
+systemctl enable rsyslog
+```
+
+配置文件：
+
+```bash
+/etc/rsyslog.conf
+/etc/rsyslog.d/*.conf
+```
+
+### 2. rsyslog 配置格式
+
+经典格式：
+
+```bash
+日志类型.日志级别    日志保存位置
+```
+
+示例：
+
+```bash
+authpriv.*        /var/log/secure
+cron.*            /var/log/cron
+*.info;mail.none;authpriv.none;cron.none    /var/log/messages
+```
+
+第一个字段表示日志来源类型，也叫 facility；第二个字段表示日志级别，也叫 priority。
+
+### 3. 日志类型 facility
+
+| 类型 | 说明 |
+| :--- | :--- |
+| `auth` | PAM 等认证相关日志 |
+| `authpriv` | SSH、FTP、sudo 等认证授权日志 |
+| `cron` | 定时任务日志 |
+| `kern` | 内核日志 |
+| `lpr` | 打印相关日志 |
+| `mail` | 邮件日志 |
+| `mark` | rsyslog 内部标记信息 |
+| `news` | 新闻组 |
+| `user` | 用户程序日志 |
+| `uucp` | Unix-to-Unix Copy 通信 |
+| `local0` - `local7` | 自定义日志类型 |
+
+PDF 中写到的 `corn` 实际应为 `cron`，表示定时任务。
+
+### 4. 日志级别 priority
+
+日志级别从低到高如下：
+
+| 级别 | 说明 |
+| :--- | :--- |
+| `debug` | 调试信息，内容最多 |
+| `info` | 普通信息，最常见 |
+| `notice` | 重要的普通事件 |
+| `warning` / `warn` | 警告 |
+| `err` / `error` | 错误 |
+| `crit` | 严重错误 |
+| `alert` | 需要立即处理 |
+| `emerg` / `panic` | 系统不可用，内核崩溃等 |
+| `none` | 不记录 |
+
+规则：
+
+```bash
+*.info
+```
+
+表示记录 `info` 及比 `info` 更严重的级别。
+
+如果只想记录某一个级别，可以使用 `=`：
+
+```bash
+*.=err    /var/log/only-error.log
+```
+
+排除某类日志：
+
+```bash
+*.info;mail.none;authpriv.none;cron.none    /var/log/messages
+```
+
+### 5. 日志格式
+
+rsyslog 记录的日志通常包含 4 部分：
+
+1. 事件产生时间。
+2. 主机名。
+3. 服务名或程序名。
+4. 事件具体内容。
+
+示例：
+
+```bash
+Jun 21 10:12:30 node01 sshd[1234]: Failed password for root from 192.168.1.10 port 45678 ssh2
+```
+
+含义：
+
+| 字段 | 示例 |
+| :--- | :--- |
+| 时间 | `Jun 21 10:12:30` |
+| 主机名 | `node01` |
+| 程序 | `sshd[1234]` |
+| 内容 | `Failed password for root...` |
+
+### 6. 自定义日志文件
+
+示例：把 sshd 相关认证日志保存到 `/var/log/hsp.log`。
+
+编辑配置：
+
+```bash
+vim /etc/rsyslog.d/hsp.conf
+```
+
+写入：
+
+```bash
+authpriv.*    /var/log/hsp.log
+```
+
+重启服务：
+
+```bash
+systemctl restart rsyslog
+```
+
+测试：
+
+```bash
+logger -p authpriv.info "test authpriv log"
+tail -f /var/log/hsp.log
+```
+
+`logger` 可以手工向 syslog 写日志：
+
+```bash
+logger "hello syslog"
+logger -p local0.info "hello local0"
+logger -t myapp "hello with tag"
+```
+
+### 7. 远程日志
+
+rsyslog 可以把日志发送到远程日志服务器。
+
+客户端示例：
+
+```bash
+*.* @@192.168.1.100:514
+```
+
+说明：
+
+| 写法 | 含义 |
+| :--- | :--- |
+| `@host:514` | UDP 发送 |
+| `@@host:514` | TCP 发送 |
+
+服务端需要开启接收模块，并放开防火墙。生产环境建议统一收集到日志平台，如 ELK、Loki、Splunk、Graylog 等。
+
+------
+
+## 第五章：systemd-journald 与 journalctl
+
+### 1. journald 基本概念
+
+`systemd-journald` 是 systemd 系统中的日志服务，采集内核、服务、启动、标准输出和标准错误等日志。查看工具是 `journalctl`。
+
+查看服务：
+
+```bash
+systemctl status systemd-journald
+```
+
+查看所有日志：
+
+```bash
+journalctl
+```
+
+PDF 中提到 `journalctl` 查看的是“内存日志，重启清空”。这在很多默认配置中成立，但现代系统可以开启持久化日志，让 journal 日志保存到磁盘。
+
+### 2. journalctl 常用命令
+
+查看最近 3 条：
+
+```bash
+journalctl -n 3
+```
+
+实时跟踪：
+
+```bash
+journalctl -f
+```
+
+查看错误日志：
+
+```bash
+journalctl -p err
+```
+
+查看详细字段：
+
+```bash
+journalctl -o verbose
+```
+
+按服务查看：
+
+```bash
+journalctl -u sshd
+journalctl -u nginx
+journalctl -u kubelet
+```
+
+按时间查看：
+
+```bash
+journalctl --since "2026-06-21 10:00:00"
+journalctl --since "1 hour ago"
+journalctl --since "19:00" --until "19:10:10"
+journalctl --since yesterday --until today
+```
+
+查看内核日志：
+
+```bash
+journalctl -k
+```
+
+查看本次启动日志：
+
+```bash
+journalctl -b
+```
+
+查看上一次启动日志：
+
+```bash
+journalctl -b -1
+```
+
+按 PID 或命令过滤：
+
+```bash
+journalctl _PID=1245
+journalctl _COMM=sshd
+```
+
+组合 grep：
+
+```bash
+journalctl | grep sshd
+journalctl -u sshd | grep "Failed password"
+```
+
+### 3. 输出格式
+
+```bash
+journalctl -o short
+journalctl -o short-iso
+journalctl -o verbose
+journalctl -o json
+journalctl -o json-pretty
+```
+
+常用推荐：
+
+```bash
+journalctl -u nginx -o short-iso
+```
+
+### 4. journal 持久化
+
+默认日志可能保存在内存目录：
+
+```bash
+/run/log/journal/
+```
+
+重启后会丢失。持久化日志一般保存在：
+
+```bash
+/var/log/journal/
+```
+
+启用持久化：
+
+```bash
+mkdir -p /var/log/journal
+systemctl restart systemd-journald
+```
+
+也可以修改配置：
+
+```bash
+vim /etc/systemd/journald.conf
+```
+
+常见配置：
+
+```ini
+[Journal]
+Storage=persistent
+SystemMaxUse=1G
+MaxRetentionSec=30day
+```
+
+重启：
+
+```bash
+systemctl restart systemd-journald
+```
+
+### 5. journal 空间管理
+
+查看占用：
+
+```bash
+journalctl --disk-usage
+```
+
+按大小清理：
+
+```bash
+journalctl --vacuum-size=1G
+```
+
+按时间清理：
+
+```bash
+journalctl --vacuum-time=30d
+```
+
+------
+
+## 第六章：内核日志 dmesg
+
+`dmesg` 查看内核环形缓冲区，常用于排查硬件、驱动、磁盘、网卡、OOM、内核错误。
+
+常用命令：
+
+```bash
+dmesg
+dmesg -T
+dmesg -w
+dmesg | tail
+```
+
+筛选关键字：
+
+```bash
+dmesg -T | grep -i error
+dmesg -T | grep -i eth
+dmesg -T | grep -i disk
+dmesg -T | grep -i oom
+```
+
+查看内核日志也可以用：
+
+```bash
+journalctl -k
+journalctl -k -b
+```
+
+常见排查场景：
+
+| 场景 | 命令 |
+| :--- | :--- |
+| 网卡驱动问题 | `dmesg -T | grep -i eth` |
+| 磁盘 I/O 错误 | `dmesg -T | grep -i "error\\|fail\\|blk"` |
+| OOM 杀进程 | `dmesg -T | grep -i "killed process"` |
+| USB 设备识别 | `dmesg -T | grep -i usb` |
+
+------
+
+## 第七章：日志轮替 logrotate
+
+### 1. 日志轮替概念
+
+日志文件会不断增长，如果不管理，可能占满磁盘。日志轮替就是：
+
+1. 把当前日志改名或加日期后缀。
+2. 创建新的空日志文件继续写入。
+3. 保留一定数量或一定时间的旧日志。
+4. 超出范围后删除旧日志。
+5. 可选：压缩旧日志。
+
+### 2. 文件命名方式
+
+启用 `dateext` 时，旧日志使用日期后缀：
+
+```bash
+secure-20260621
+messages-20260621
+```
+
+未启用 `dateext` 时，使用数字后缀：
+
+```bash
+secure
+secure.1
+secure.2
+secure.3
+```
+
+启用压缩后可能是：
+
+```bash
+secure-20260621.gz
+secure.1.gz
+```
+
+### 3. logrotate 配置文件
+
+全局配置：
+
+```bash
+/etc/logrotate.conf
+```
+
+子配置目录：
+
+```bash
+/etc/logrotate.d/
+```
+
+推荐把自己的日志轮替规则放到 `/etc/logrotate.d/`，不要把所有配置都塞进 `/etc/logrotate.conf`。
+
+全局配置示例：
+
+```bash
+weekly
+rotate 4
+create
+dateext
+include /etc/logrotate.d
+```
+
+含义：
+
+| 配置 | 说明 |
+| :--- | :--- |
+| `daily` | 每天轮替 |
+| `weekly` | 每周轮替 |
+| `monthly` | 每月轮替 |
+| `rotate 4` | 保留 4 份旧日志 |
+| `create` | 轮替后创建新日志 |
+| `dateext` | 使用日期作为后缀 |
+| `compress` | 压缩旧日志 |
+| `missingok` | 日志不存在时不报错 |
+| `notifempty` | 空日志不轮替 |
+| `minsize 1M` | 达到最小大小才轮替 |
+| `size 100M` | 超过指定大小才轮替 |
+| `sharedscripts` | 多个日志匹配时脚本只执行一次 |
+| `prerotate/endscript` | 轮替前执行脚本 |
+| `postrotate/endscript` | 轮替后执行脚本 |
+
+### 4. wtmp 和 btmp 示例
+
+```bash
+/var/log/wtmp {
+    monthly
+    create 0664 root utmp
+    minsize 1M
+    rotate 1
+}
+
+/var/log/btmp {
+    missingok
+    monthly
+    create 0600 root utmp
+    rotate 1
+}
+```
+
+说明：
+
+1. `/var/log/wtmp` 每月轮替，至少大于 `1M` 才轮替。
+2. 新文件权限是 `0664`，所有者 `root`，所属组 `utmp`。
+3. `/var/log/btmp` 不存在时不警告。
+4. 两者都只保留 1 份旧日志。
+
+### 5. 自定义日志轮替
+
+假设应用日志是：
+
+```bash
+/var/log/myapp/app.log
+```
+
+创建配置：
+
+```bash
+vim /etc/logrotate.d/myapp
+```
+
+写入：
+
+```bash
+/var/log/myapp/*.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    dateext
+    create 0640 myapp myapp
+    sharedscripts
+    postrotate
+        systemctl reload myapp >/dev/null 2>&1 || true
+    endscript
+}
+```
+
+说明：
+
+| 配置 | 说明 |
+| :--- | :--- |
+| `daily` | 每天轮替 |
+| `rotate 14` | 保留 14 份 |
+| `compress` | 压缩旧日志 |
+| `delaycompress` | 延迟一轮再压缩，避免服务仍写旧文件 |
+| `create 0640 myapp myapp` | 创建新日志并指定权限、用户、组 |
+| `postrotate` | 轮替后通知服务重新打开日志文件 |
+
+### 6. 测试 logrotate
+
+调试，不真正执行：
+
+```bash
+logrotate -d /etc/logrotate.d/myapp
+```
+
+强制执行：
+
+```bash
+logrotate -f /etc/logrotate.d/myapp
+```
+
+查看状态文件：
+
+```bash
+cat /var/lib/logrotate/logrotate.status
+```
+
+### 7. logrotate 运行机制
+
+logrotate 通常依赖系统定时任务执行。
+
+传统 cron：
+
+```bash
+ls -l /etc/cron.daily/logrotate
+```
+
+systemd timer：
+
+```bash
+systemctl list-timers | grep logrotate
+systemctl status logrotate.timer
+systemctl status logrotate.service
+```
+
+不同发行版实现略有差异。
+
+------
+
+## 第八章：常见日志分析示例
+
+### 1. 统计 Nginx 访问量最高的 IP
+
+```bash
+awk '{print $1}' access.log | sort | uniq -c | sort -nr | head
+```
+
+含义：
+
+1. `awk '{print $1}'` 取第一列 IP。
+2. `sort` 排序。
+3. `uniq -c` 统计次数。
+4. `sort -nr` 按数字倒序。
+5. `head` 取前几名。
+
+### 2. 统计访问量最高的 URL
+
+Nginx combined 格式中，URL 常在第 7 列：
+
+```bash
+awk '{print $7}' access.log | sort | uniq -c | sort -nr | head
+```
+
+### 3. 统计 HTTP 状态码
+
+```bash
+awk '{print $9}' access.log | sort | uniq -c | sort -nr
+```
+
+### 4. 查看 500 错误
+
+```bash
+awk '$9 ~ /^5/ {print}' access.log | head
+```
+
+### 5. 统计 SSH 登录失败来源 IP
+
+CentOS/RHEL：
+
+```bash
+grep "Failed password" /var/log/secure \
+  | awk '{for(i=1;i<=NF;i++) if($i=="from") print $(i+1)}' \
+  | sort | uniq -c | sort -nr | head
+```
+
+Debian/Ubuntu：
+
+```bash
+grep "Failed password" /var/log/auth.log \
+  | awk '{for(i=1;i<=NF;i++) if($i=="from") print $(i+1)}' \
+  | sort | uniq -c | sort -nr | head
+```
+
+### 6. 查看 sudo 操作
+
+CentOS/RHEL：
+
+```bash
+grep "sudo" /var/log/secure
+```
+
+Debian/Ubuntu：
+
+```bash
+grep "sudo" /var/log/auth.log
+```
+
+journald：
+
+```bash
+journalctl _COMM=sudo
+```
+
+### 7. 查找最近的错误
+
+```bash
+grep -iE "error|fail|fatal|panic|denied" /var/log/messages | tail -n 50
+journalctl -p warning -n 100
+```
+
+### 8. 查看某服务最近日志
+
+```bash
+journalctl -u nginx -n 100 --no-pager
+journalctl -u nginx -f
+```
+
+### 9. 查看某个时间段日志
+
+```bash
+journalctl --since "2026-06-21 10:00:00" --until "2026-06-21 11:00:00"
+```
+
+### 10. 查找大日志文件
+
+```bash
+find /var/log -type f -size +100M -print
+du -ah /var/log | sort -rh | head
+```
+
+------
+
+## 第九章：日志排障流程
+
+### 1. 服务启动失败
+
+```bash
+systemctl status 服务名 --no-pager
+journalctl -u 服务名 -n 100 --no-pager
+journalctl -u 服务名 -f
+```
+
+重点看：
+
+1. 配置文件语法错误。
+2. 端口被占用。
+3. 权限不足。
+4. 依赖服务未启动。
+5. 文件路径不存在。
+
+### 2. SSH 登录失败
+
+CentOS/RHEL：
+
+```bash
+tail -f /var/log/secure
+grep "Failed password" /var/log/secure
+grep "Accepted" /var/log/secure
+```
+
+Debian/Ubuntu：
+
+```bash
+tail -f /var/log/auth.log
+grep "Failed password" /var/log/auth.log
+grep "Accepted" /var/log/auth.log
+```
+
+常见原因：
+
+1. 密码错误。
+2. 用户不存在。
+3. 用户被锁定。
+4. SSH 配置禁止 root 登录。
+5. 公钥权限错误。
+6. 防火墙或安全组限制。
+
+### 3. 系统异常重启
+
+```bash
+last -x | head
+journalctl -b -1
+journalctl -k -b -1
+```
+
+如果日志没有持久化，重启前的 journal 可能不存在，应考虑启用 journald 持久化。
+
+### 4. 磁盘满
+
+```bash
+df -h
+du -ah /var/log | sort -rh | head
+journalctl --disk-usage
+```
+
+清理 journal：
+
+```bash
+journalctl --vacuum-size=1G
+journalctl --vacuum-time=30d
+```
+
+不要直接删除正在被进程打开的日志文件，否则磁盘空间可能不会立刻释放。应优先使用 logrotate 或重启/通知服务重新打开日志。
+
+查看已删除但仍被占用的文件：
+
+```bash
+lsof | grep deleted
+```
+
+### 5. 容器日志过大
+
+Docker 默认 json 日志可能很大：
+
+```bash
+du -ah /var/lib/docker/containers | sort -rh | head
+```
+
+查看容器日志：
+
+```bash
+docker logs 容器名
+docker logs --tail 100 -f 容器名
+```
+
+建议配置 Docker 日志轮转：
+
+```json
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m",
+    "max-file": "3"
+  }
+}
+```
+
+配置文件常见位置：
+
+```bash
+/etc/docker/daemon.json
+```
+
+------
+
+## 第十章：日志权限与安全
+
+日志常包含敏感信息，如用户名、IP、Token、请求参数、错误堆栈。要注意权限和留存策略。
+
+建议：
+
+1. `/var/log/secure`、`/var/log/auth.log` 等认证日志应限制普通用户读取。
+2. 应用日志避免打印明文密码、Token、身份证、手机号等敏感信息。
+3. 重要日志应集中收集，防止攻击者登录后删除本机日志。
+4. 定期备份和轮转日志。
+5. 对关键日志目录设置合理权限。
+6. 对安全审计要求高的系统，可把日志实时发送到远程日志服务器。
+
+查看权限：
+
+```bash
+ls -l /var/log/secure
+ls -l /var/log/auth.log
+```
+
+查找可被普通用户写入的日志文件：
+
+```bash
+find /var/log -type f -perm -002 -ls
+```
+
+------
+
+## 🔧 日志管理命令汇总
+
+### 文本日志
+
+```bash
+tail -f /var/log/messages
+tail -n 100 -f /var/log/secure
+less /var/log/syslog
+grep -i "error" /var/log/messages
+zgrep "error" /var/log/messages-*.gz
+```
+
+### rsyslog
+
+```bash
+systemctl status rsyslog
+systemctl restart rsyslog
+logger "test log"
+logger -p local0.info "test local0"
+```
+
+### journalctl
+
+```bash
+journalctl
+journalctl -n 100
+journalctl -f
+journalctl -u sshd
+journalctl -u nginx --since "1 hour ago"
+journalctl -p err
+journalctl -k
+journalctl -b
+journalctl --disk-usage
+```
+
+### logrotate
+
+```bash
+logrotate -d /etc/logrotate.conf
+logrotate -f /etc/logrotate.d/myapp
+cat /var/lib/logrotate/logrotate.status
+systemctl status logrotate.timer
+```
+
+### 登录审计
+
+```bash
+w
+who
+last
+lastb
+lastlog
+grep "Failed password" /var/log/secure
+grep "sudo" /var/log/auth.log
+```
+
+------
+
+## 📌 日志管理总结要点
+
+1. `/var/log/` 是系统文本日志的主要目录。
+2. CentOS/RHEL 认证日志常见是 `/var/log/secure`，Debian/Ubuntu 是 `/var/log/auth.log`。
+3. `rsyslog` 负责传统系统日志采集和分发，配置核心是“日志类型.日志级别 日志位置”。
+4. `journalctl` 用于查看 systemd-journald 日志，可按服务、时间、级别、启动批次过滤。
+5. `logrotate` 用于日志轮替，防止日志无限增长占满磁盘。
+6. 排障时优先看 `systemctl status`、`journalctl -u 服务名`、应用自己的 error log。
+7. 安全审计重点关注 SSH 登录失败、sudo 操作、异常重启和日志被清理的痕迹。
+8. 生产环境建议做日志轮转、集中收集、权限控制和敏感信息脱敏。
+
 # 软件包管理
 
 ## 第一章：软件包管理概述
@@ -10032,6 +11109,7 @@ echo "上一条命令退出码=$?"
 ```bash
 #!/bin/bash
 
+# -ne not equal 不等于
 if [ "$#" -ne 2 ]; then
   echo "用法: $0 <源目录> <目标目录>"
   exit 1
@@ -10148,6 +11226,30 @@ sum=$(expr 2 + 3)
 mul=$(expr "$sum" \* 4)
 ```
 
+```bash
+# 第一种写法
+sum1=$((a + b))
+mul1=$(((a + b) * 4))
+
+# 第二种写法
+sum2=$[$a + $b]
+mul2=$[$sum2 * 4]
+
+
+# 第三种写法
+sum3=$(expr 2 + 3)
+mul3=$(expr "$sum3" \* 4)
+
+echo "$sum1"
+echo "$mul1"
+echo "$sum2"
+echo "$mul2"
+echo "$sum3"
+echo "$mul3"
+```
+
+
+
 ### 2. 自增自减
 
 ```bash
@@ -10202,6 +11304,10 @@ echo "$?"
 
 [ 23 -ge 22 ] && echo "OK" || echo "not OK"
 ```
+
+> [  ] 空为假
+>
+> [ ] 内有内容 但是没有判断 为真
 
 ### 2. 字符串判断
 
@@ -10727,14 +11833,122 @@ log_error "backup failed"
 | `1` | stdout | 标准输出 |
 | `2` | stderr | 标准错误 |
 
+默认情况下：
+
+1. 标准输入 `0` 来自键盘。
+2. 标准输出 `1` 输出到屏幕。
+3. 标准错误 `2` 也输出到屏幕。
+
+所以普通命令会把正常结果和错误信息都显示在终端：
+
+```bash
+ls /etc        # 正常输出到屏幕，属于 stdout，编号 1
+ls /not-exist  # 错误输出到屏幕，属于 stderr，编号 2
+```
+
 ### 2. 重定向
 
 ```bash
 command > file        # 覆盖标准输出
 command >> file       # 追加标准输出
 command 2> err.log    # 错误输出
-command > all.log 2>&1
+command > all.log 2>&1 
 command &> all.log    # bash 支持
+```
+
+`>` 默认重定向的是标准输出 `1`，所以这两种写法等价：
+
+```bash
+command > out.log
+command 1> out.log
+```
+
+如果要处理错误输出，必须显式写 `2`：
+
+```bash
+command 2> err.log
+```
+
+示例：
+
+```bash
+ls /etc > out.log
+```
+
+只把正常输出写入 `out.log`。
+
+```bash
+ls /not-exist > out.log
+```
+
+错误信息仍然会显示在屏幕，因为 `>` 默认只处理 `1`，不处理 `2`。
+
+```bash
+ls /not-exist 2> err.log
+```
+
+错误信息写入 `err.log`。
+
+### 3. `2>&1` 怎么理解
+
+```bash
+command > all.log 2>&1
+```
+
+拆开看：
+
+```bash
+command > all.log
+```
+
+先把标准输出 `1` 指向 `all.log`。
+
+```bash
+2>&1
+```
+
+再把标准错误 `2` 指向标准输出 `1` 当前指向的位置，也就是 `all.log`。
+
+因此最终效果是：正常输出和错误输出都写入 `all.log`。
+
+顺序很重要：
+
+```bash
+command > all.log 2>&1
+```
+
+正常输出和错误输出都进入 `all.log`。
+
+```bash
+command 2>&1 > all.log
+```
+
+错误输出仍然显示在屏幕，只有正常输出进入 `all.log`。因为执行 `2>&1` 时，标准输出 `1` 还指向屏幕。
+
+### 4. `&>` 和 `&>>`
+
+`&>` 是 bash 的简写，表示标准输出和标准错误都写入同一个文件：
+
+```bash
+command &> all.log
+```
+
+等价于：
+
+```bash
+command > all.log 2>&1
+```
+
+追加写法：
+
+```bash
+command &>> all.log
+```
+
+等价于：
+
+```bash
+command >> all.log 2>&1
 ```
 
 丢弃输出：
@@ -10743,7 +11957,25 @@ command &> all.log    # bash 支持
 command > /dev/null 2>&1
 ```
 
-### 3. 管道
+`/dev/null` 是一个特殊文件，可以理解为“黑洞”。写进去的内容都会被丢弃。常见用途是安静执行命令：
+
+```bash
+ping -c 1 www.baidu.com > /dev/null 2>&1
+```
+
+脚本和定时任务中常见写法：
+
+```bash
+./job.sh >> job.log 2>&1
+```
+
+含义：
+
+1. 正常输出追加到 `job.log`。
+2. 错误输出也追加到 `job.log`。
+3. 方便后续排查后台任务或定时任务问题。
+
+### 5. 管道
 
 ```bash
 ps aux | grep nginx
@@ -10756,7 +11988,73 @@ cat access.log | grep "ERROR" | wc -l
 grep "ERROR" access.log | wc -l
 ```
 
-### 4. 退出码
+管道 `|` 的含义是：把左侧命令的标准输出，作为右侧命令的标准输入。
+
+```bash
+ps aux | grep nginx
+```
+
+可以理解为：
+
+1. `ps aux` 输出所有进程。
+2. `grep nginx` 从这些输出中筛选包含 `nginx` 的行。
+
+### 6. `&` 和常见命令连接符
+
+`&` 在 Shell 中要看位置，不同位置含义不同。
+
+| 符号 | 含义 | 示例 |
+| :--- | :--- | :--- |
+| `&` | 命令放到后台执行 | `sleep 60 &` |
+| `2>&1` | 标准错误跟随标准输出 | `cmd > all.log 2>&1` |
+| `&>` | 标准输出和标准错误都写入文件 | `cmd &> all.log` |
+| `&&` | 前一个命令成功才执行后一个 | `mkdir dir && cd dir` |
+| `||` | 前一个命令失败才执行后一个 | `cmd || echo failed` |
+| `;` | 不管成功失败都继续执行下一个 | `cmd1; cmd2` |
+| `|` | 管道，前一个输出交给后一个 | `ps aux | grep nginx` |
+| `<` | 输入重定向，从文件读取 | `sort < names.txt` |
+| `>` | 输出重定向，覆盖写入 | `echo hi > a.txt` |
+| `>>` | 输出重定向，追加写入 | `echo hi >> a.txt` |
+
+后台执行：
+
+```bash
+sleep 60 &
+jobs
+fg %1
+```
+
+成功才继续：
+
+```bash
+mkdir /tmp/test && cd /tmp/test
+```
+
+失败才执行：
+
+```bash
+systemctl is-active --quiet nginx || systemctl start nginx
+```
+
+无论成败都继续：
+
+```bash
+command1; command2
+```
+
+综合示例：
+
+```bash
+./job.sh >> job.log 2>&1 &
+```
+
+含义：
+
+1. `./job.sh` 在后台运行。
+2. 标准输出追加到 `job.log`。
+3. 标准错误也跟随标准输出，追加到 `job.log`。
+
+### 7. 退出码
 
 ```bash
 command
@@ -10775,7 +12073,7 @@ echo "$?"
 | `127` | 命令不存在 |
 | `130` | 被 `Ctrl+C` 中断 |
 
-### 5. `set -euo pipefail`
+### 8. `set -euo pipefail`
 
 常见脚本增强开关：
 
@@ -11258,3 +12556,2880 @@ cmd >/dev/null 2>&1
 6. 循环读文件时推荐 `while IFS= read -r line`。
 7. 函数返回字符串用 `echo`，返回成功失败用 `return`。
 8. 生产脚本要重视日志、参数校验、错误处理、加锁和敏感信息保护。
+
+
+
+# 系统定制
+
+## 第一章：系统定制概述
+
+系统定制指的是在 Linux 安装完成后，根据使用场景调整系统行为。
+
+常见目标：
+
+1. 让系统更符合使用习惯。
+2. 让系统启动、登录、服务管理更可控。
+3. 统一服务器环境，方便批量运维。
+4. 加强安全限制。
+5. 优化资源限制、内核参数和日志策略。
+
+系统定制不是随便修改配置文件，而是要清楚每个配置影响哪一层：
+
+| 层级 | 典型内容 | 示例 |
+| :--- | :--- | :--- |
+| 用户层 | Shell、别名、环境变量、提示符 | `.bashrc`、`.profile` |
+| 系统层 | 主机名、时间、语言、登录提示 | `/etc/hostname`、`timedatectl` |
+| 服务层 | systemd 服务、自启动、target | `systemctl enable nginx` |
+| 安全层 | sudo、SSH、limits、PAM | `/etc/sudoers`、`/etc/security/limits.conf` |
+| 内核层 | sysctl、模块、启动参数 | `/etc/sysctl.conf`、GRUB |
+
+系统定制的基本原则：
+
+1. 修改前备份原配置。
+2. 优先使用发行版推荐工具。
+3. 配置写到专用 `.d` 目录，少直接改主文件。
+4. 修改后验证语法。
+5. 修改后重启相关服务，而不是盲目重启机器。
+6. 生产环境先在测试机验证。
+
+------
+
+## 第二章：主机名、时间、语言环境
+
+### 1. 主机名
+
+查看主机名：
+
+```bash
+hostname
+hostnamectl
+```
+
+临时修改：
+
+```bash
+hostname web01
+```
+
+永久修改：
+
+```bash
+sudo hostnamectl set-hostname web01
+```
+
+查看配置文件：
+
+```bash
+cat /etc/hostname
+```
+
+建议同时配置 `/etc/hosts`：
+
+```bash
+sudo vim /etc/hosts
+```
+
+示例：
+
+```text
+127.0.0.1 localhost
+127.0.1.1 web01
+192.168.10.11 web01
+```
+
+如果主机名解析不正常，可能导致 sudo 慢、服务启动慢、日志中主机名混乱。
+
+### 2. 时间和时区
+
+查看时间状态：
+
+```bash
+timedatectl
+```
+
+设置时区：
+
+```bash
+sudo timedatectl set-timezone Asia/Shanghai
+```
+
+查看所有时区：
+
+```bash
+timedatectl list-timezones
+```
+
+开启 NTP 自动同步：
+
+```bash
+sudo timedatectl set-ntp true
+```
+
+查看时间同步服务：
+
+```bash
+systemctl status systemd-timesyncd
+```
+
+时间准确非常重要，影响：
+
+- 日志时间线。
+- 证书有效期。
+- 定时任务。
+- 数据库时间字段。
+- 分布式系统一致性。
+
+### 3. 语言和字符集
+
+查看当前 locale：
+
+```bash
+locale
+```
+
+查看可用 locale：
+
+```bash
+locale -a
+```
+
+Ubuntu 生成中文 UTF-8：
+
+```bash
+sudo locale-gen zh_CN.UTF-8
+sudo update-locale LANG=zh_CN.UTF-8
+```
+
+服务器环境常用英文 UTF-8：
+
+```bash
+sudo update-locale LANG=en_US.UTF-8
+```
+
+建议服务器使用 UTF-8，避免文件名、日志、脚本输出乱码。
+
+------
+
+## 第三章：Shell 环境定制
+
+### 1. 常见配置文件加载顺序
+
+Bash 登录 Shell 常见读取顺序：
+
+```text
+/etc/profile
+~/.bash_profile
+~/.bash_login
+~/.profile
+```
+
+Bash 非登录交互 Shell 常见读取：
+
+```text
+~/.bashrc
+```
+
+系统级配置：
+
+```text
+/etc/profile
+/etc/bash.bashrc
+/etc/profile.d/*.sh
+```
+
+用户级配置：
+
+```text
+~/.profile
+~/.bashrc
+~/.bash_aliases
+```
+
+建议：
+
+- 个人别名写到 `~/.bash_aliases`。
+- 个人 PATH 写到 `~/.profile` 或 `~/.bashrc`。
+- 全局配置写到 `/etc/profile.d/custom.sh`。
+- 不要把大量个人配置直接塞进 `/etc/profile`。
+
+### 2. 配置别名
+
+```bash
+vim ~/.bash_aliases
+```
+
+示例：
+
+```bash
+alias ll='ls -alF'
+alias grep='grep --color=auto'
+alias ports='ss -lntp'
+alias c='clear'
+```
+
+使其生效：
+
+```bash
+source ~/.bashrc
+```
+
+查看别名：
+
+```bash
+alias
+```
+
+取消别名：
+
+```bash
+unalias ll
+```
+
+### 3. 配置 PATH
+
+临时添加：
+
+```bash
+export PATH="/opt/mybin:$PATH"
+```
+
+永久添加到用户环境：
+
+```bash
+vim ~/.profile
+```
+
+写入：
+
+```bash
+export PATH="/opt/mybin:$PATH"
+```
+
+生效：
+
+```bash
+source ~/.profile
+```
+
+注意：
+
+- 不要把 `.` 放进 PATH，容易执行当前目录中的恶意命令。
+- 系统级 PATH 修改前要评估所有用户影响。
+- 脚本中尽量使用绝对路径，减少环境依赖。
+
+### 4. 命令提示符 PS1
+
+查看当前提示符：
+
+```bash
+echo "$PS1"
+```
+
+示例：
+
+```bash
+export PS1='\u@\h:\w\$ '
+```
+
+含义：
+
+| 符号 | 含义 |
+| :--- | :--- |
+| `\u` | 当前用户名 |
+| `\h` | 主机名 |
+| `\w` | 当前目录 |
+| `\t` | 当前时间 |
+| `\$` | root 显示 `#`，普通用户显示 `$` |
+
+服务器上不要把提示符做得过于花哨，清晰显示用户、主机、路径更重要。
+
+------
+
+## 第四章：登录提示和用户模板
+
+### 1. 登录前提示 `/etc/issue`
+
+本地终端登录前显示：
+
+```bash
+cat /etc/issue
+```
+
+修改：
+
+```bash
+sudo vim /etc/issue
+```
+
+### 2. SSH 登录后提示 `/etc/motd`
+
+登录后显示：
+
+```bash
+cat /etc/motd
+```
+
+修改：
+
+```bash
+sudo vim /etc/motd
+```
+
+示例：
+
+```text
+Authorized access only.
+All activities may be monitored and logged.
+```
+
+### 3. Ubuntu 动态 MOTD
+
+Ubuntu 还可能使用动态 MOTD：
+
+```bash
+ls /etc/update-motd.d/
+```
+
+这些脚本会在登录时生成系统信息。
+
+禁用某个脚本：
+
+```bash
+sudo chmod -x /etc/update-motd.d/50-motd-news
+```
+
+### 4. 用户模板 `/etc/skel`
+
+新用户家目录默认从 `/etc/skel` 复制。
+
+查看：
+
+```bash
+ls -la /etc/skel
+```
+
+如果希望新用户自动拥有某些配置，可以放到这里：
+
+```bash
+sudo vim /etc/skel/.bash_aliases
+```
+
+之后新建用户：
+
+```bash
+sudo useradd -m testuser
+```
+
+`testuser` 的家目录会包含模板文件。
+
+------
+
+## 第五章：systemd 服务定制
+
+### 1. 查看服务状态
+
+```bash
+systemctl status ssh
+systemctl is-enabled ssh
+systemctl is-active ssh
+```
+
+启动、停止、重启：
+
+```bash
+sudo systemctl start ssh
+sudo systemctl stop ssh
+sudo systemctl restart ssh
+```
+
+设置开机自启：
+
+```bash
+sudo systemctl enable ssh
+```
+
+取消开机自启：
+
+```bash
+sudo systemctl disable ssh
+```
+
+### 2. Unit 文件位置
+
+常见路径：
+
+```text
+/usr/lib/systemd/system/
+/lib/systemd/system/
+/etc/systemd/system/
+```
+
+一般规则：
+
+- 软件包自带 unit 通常在 `/lib/systemd/system/` 或 `/usr/lib/systemd/system/`。
+- 管理员自定义 unit 放在 `/etc/systemd/system/`。
+- 不建议直接改软件包自带 unit，因为升级可能覆盖。
+
+### 3. 使用 drop-in 覆盖配置
+
+查看服务原始 unit：
+
+```bash
+systemctl cat nginx
+```
+
+创建覆盖配置：
+
+```bash
+sudo systemctl edit nginx
+```
+
+示例：
+
+```ini
+[Service]
+Restart=always
+RestartSec=5
+```
+
+保存后执行：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart nginx
+```
+
+查看最终配置：
+
+```bash
+systemctl cat nginx
+```
+
+### 4. 自定义服务示例
+
+创建脚本：
+
+```bash
+sudo vim /opt/hello.sh
+```
+
+内容：
+
+```bash
+#!/bin/bash
+while true; do
+  echo "$(date) hello systemd" >> /var/log/hello.log
+  sleep 10
+done
+```
+
+授权：
+
+```bash
+sudo chmod +x /opt/hello.sh
+```
+
+创建 unit：
+
+```bash
+sudo vim /etc/systemd/system/hello.service
+```
+
+内容：
+
+```ini
+[Unit]
+Description=Hello Demo Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/hello.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+加载并启动：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now hello
+sudo systemctl status hello
+```
+
+查看日志：
+
+```bash
+journalctl -u hello -f
+```
+
+### 5. target 定制
+
+查看默认 target：
+
+```bash
+systemctl get-default
+```
+
+常见 target：
+
+| target | 含义 |
+| :--- | :--- |
+| `multi-user.target` | 多用户命令行模式 |
+| `graphical.target` | 图形界面模式 |
+| `rescue.target` | 救援模式 |
+| `emergency.target` | 紧急模式 |
+
+设置默认进入命令行：
+
+```bash
+sudo systemctl set-default multi-user.target
+```
+
+设置默认进入图形界面：
+
+```bash
+sudo systemctl set-default graphical.target
+```
+
+------
+
+## 第六章：资源限制定制
+
+### 1. 查看当前限制
+
+```bash
+ulimit -a
+```
+
+常见限制：
+
+| 项 | 含义 |
+| :--- | :--- |
+| `open files` | 单进程最大打开文件数 |
+| `max user processes` | 用户最大进程数 |
+| `stack size` | 栈大小 |
+| `core file size` | core 文件大小 |
+
+### 2. 临时修改
+
+```bash
+ulimit -n 65535
+```
+
+只对当前 shell 及其子进程生效。
+
+### 3. 永久修改 limits.conf
+
+编辑：
+
+```bash
+sudo vim /etc/security/limits.conf
+```
+
+示例：
+
+```text
+* soft nofile 65535
+* hard nofile 65535
+* soft nproc  65535
+* hard nproc  65535
+```
+
+或者放到：
+
+```text
+/etc/security/limits.d/*.conf
+```
+
+注意：
+
+- 需要重新登录才会生效。
+- systemd 服务不一定读取用户登录 limits。
+
+### 4. systemd 服务资源限制
+
+对服务设置文件描述符：
+
+```bash
+sudo systemctl edit nginx
+```
+
+写入：
+
+```ini
+[Service]
+LimitNOFILE=65535
+```
+
+生效：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart nginx
+```
+
+查看进程限制：
+
+```bash
+cat /proc/$(pidof nginx | awk '{print $1}')/limits
+```
+
+------
+
+## 第七章：sysctl 系统参数定制
+
+### 1. 查看参数
+
+```bash
+sysctl -a
+sysctl net.ipv4.ip_forward
+```
+
+### 2. 临时修改
+
+```bash
+sudo sysctl -w net.ipv4.ip_forward=1
+```
+
+重启后失效。
+
+### 3. 永久修改
+
+推荐创建独立文件：
+
+```bash
+sudo vim /etc/sysctl.d/99-custom.conf
+```
+
+示例：
+
+```text
+net.ipv4.ip_forward = 1
+vm.swappiness = 10
+fs.file-max = 2097152
+```
+
+加载：
+
+```bash
+sudo sysctl --system
+```
+
+### 4. 常见参数解释
+
+| 参数 | 含义 |
+| :--- | :--- |
+| `net.ipv4.ip_forward` | 是否开启 IPv4 转发 |
+| `vm.swappiness` | 使用 swap 的积极程度 |
+| `fs.file-max` | 系统级最大文件句柄数 |
+| `net.core.somaxconn` | listen 队列上限 |
+| `net.ipv4.tcp_syncookies` | SYN flood 防护 |
+
+不要盲目复制所谓“优化参数”。内核参数和业务负载、内核版本、网络环境有关，修改前要知道原因，修改后要观察效果。
+
+------
+
+## 第八章：SSH 基础安全定制
+
+SSH 配置文件：
+
+```text
+/etc/ssh/sshd_config
+```
+
+修改前备份：
+
+```bash
+sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
+```
+
+常见安全配置：
+
+```text
+PermitRootLogin no
+PasswordAuthentication no
+PubkeyAuthentication yes
+Port 22
+ClientAliveInterval 300
+ClientAliveCountMax 2
+```
+
+检查语法：
+
+```bash
+sudo sshd -t
+```
+
+重启服务：
+
+```bash
+sudo systemctl restart ssh
+```
+
+注意：
+
+- 禁用密码登录前，必须确认密钥登录可用。
+- 修改 SSH 端口前，必须确认防火墙和云安全组已放行。
+- 远程服务器修改 SSH 时，建议保留一个已登录窗口，避免把自己锁在外面。
+
+------
+
+## 🔧 系统定制常用命令汇总
+
+```bash
+# 主机名
+hostnamectl
+sudo hostnamectl set-hostname web01
+
+# 时间
+timedatectl
+sudo timedatectl set-timezone Asia/Shanghai
+sudo timedatectl set-ntp true
+
+# locale
+locale
+locale -a
+sudo update-locale LANG=en_US.UTF-8
+
+# systemd
+systemctl status nginx
+systemctl enable --now nginx
+systemctl cat nginx
+sudo systemctl edit nginx
+sudo systemctl daemon-reload
+
+# limits
+ulimit -a
+cat /proc/PID/limits
+
+# sysctl
+sysctl net.ipv4.ip_forward
+sudo sysctl -w net.ipv4.ip_forward=1
+sudo sysctl --system
+```
+
+------
+
+## 📌 系统定制总结要点
+
+1. 系统定制要分清用户层、系统层、服务层、安全层和内核层。
+2. 主机名、时间、locale 是服务器初始化的基础项。
+3. 用户级 Shell 配置优先写到家目录，全局配置优先写到 `/etc/profile.d/`。
+4. systemd 服务不要直接改软件包自带 unit，优先使用 `systemctl edit`。
+5. `limits.conf` 影响登录用户，systemd 服务限制要在 unit 中配置。
+6. sysctl 参数不要盲目套模板，要知道参数含义。
+7. SSH 安全配置修改前必须保留回退路径。
+
+
+
+# 内核
+
+## 第一章：内核概述
+
+Linux 内核是操作系统的核心，负责管理硬件和系统资源。
+
+主要职责：
+
+1. 进程调度。
+2. 内存管理。
+3. 文件系统。
+4. 网络协议栈。
+5. 设备驱动。
+6. 权限和安全机制。
+7. 系统调用接口。
+
+用户程序不能直接操作硬件，而是通过系统调用请求内核完成工作。
+
+简化结构：
+
+```text
+应用程序
+  -> glibc / 系统调用
+  -> Linux 内核
+  -> CPU / 内存 / 磁盘 / 网卡
+```
+
+例如执行：
+
+```bash
+cat /etc/hosts
+```
+
+背后会涉及：
+
+- `open()` 打开文件。
+- `read()` 读取内容。
+- `write()` 输出到终端。
+- 文件系统和磁盘驱动参与数据读取。
+
+------
+
+## 第二章：查看内核信息
+
+### 1. 查看内核版本
+
+```bash
+uname -r
+```
+
+示例：
+
+```text
+6.8.0-35-generic
+```
+
+含义大致是：
+
+- `6.8.0`：上游内核版本。
+- `35`：发行版维护的构建版本。
+- `generic`：内核 flavor，Ubuntu 通用内核。
+
+查看完整信息：
+
+```bash
+uname -a
+```
+
+### 2. 查看发行版信息
+
+```bash
+cat /etc/os-release
+lsb_release -a
+```
+
+注意：发行版版本和内核版本不是一回事。
+
+例如 Ubuntu 24.04 可以运行 `6.8` 系列内核，但也可能通过 HWE、云厂商镜像或手工安装运行其他内核。
+
+### 3. 查看启动参数
+
+```bash
+cat /proc/cmdline
+```
+
+示例：
+
+```text
+BOOT_IMAGE=/boot/vmlinuz-6.8.0-35-generic root=UUID=xxx ro quiet splash
+```
+
+常见参数：
+
+| 参数 | 含义 |
+| :--- | :--- |
+| `root=UUID=...` | 根文件系统位置 |
+| `ro` | 启动早期只读挂载根文件系统 |
+| `quiet` | 减少启动输出 |
+| `splash` | 显示启动画面 |
+| `single` | 单用户模式 |
+| `systemd.unit=rescue.target` | 进入救援模式 |
+
+### 4. 查看内核配置
+
+Ubuntu 常见：
+
+```bash
+ls /boot/config-$(uname -r)
+grep CONFIG_BPF /boot/config-$(uname -r)
+```
+
+部分系统支持：
+
+```bash
+zcat /proc/config.gz
+```
+
+------
+
+## 第三章：内核模块管理
+
+内核模块是可以动态加载和卸载的内核功能组件。
+
+常见模块：
+
+- 文件系统驱动。
+- 网卡驱动。
+- 存储驱动。
+- iptables/nftables 相关模块。
+- 虚拟化模块。
+
+### 1. 查看已加载模块
+
+```bash
+lsmod
+```
+
+输出示例：
+
+```text
+Module                  Size  Used by
+br_netfilter           32768  0
+overlay               196608  2
+```
+
+字段含义：
+
+- `Module`：模块名。
+- `Size`：模块大小。
+- `Used by`：被哪些模块或组件引用。
+
+### 2. 查看模块信息
+
+```bash
+modinfo overlay
+```
+
+常见字段：
+
+- `filename`：模块文件路径。
+- `description`：说明。
+- `license`：许可证。
+- `depends`：依赖模块。
+
+### 3. 加载模块
+
+```bash
+sudo modprobe br_netfilter
+```
+
+`modprobe` 会自动处理依赖。
+
+也可以用 `insmod`：
+
+```bash
+sudo insmod /path/to/module.ko
+```
+
+但 `insmod` 不自动处理依赖，日常更推荐 `modprobe`。
+
+### 4. 卸载模块
+
+```bash
+sudo modprobe -r br_netfilter
+```
+
+如果模块正在被使用，卸载会失败。
+
+### 5. 开机自动加载模块
+
+创建配置：
+
+```bash
+sudo vim /etc/modules-load.d/k8s.conf
+```
+
+写入：
+
+```text
+overlay
+br_netfilter
+```
+
+加载：
+
+```bash
+sudo systemctl restart systemd-modules-load
+```
+
+或重启系统。
+
+------
+
+## 第四章：内核日志
+
+内核日志用于排查硬件、驱动、文件系统、网络栈等问题。
+
+### 1. dmesg
+
+查看内核 ring buffer：
+
+```bash
+dmesg
+dmesg -T
+```
+
+实时跟踪：
+
+```bash
+dmesg -wT
+```
+
+按级别过滤：
+
+```bash
+dmesg --level=err,warn
+```
+
+### 2. journalctl -k
+
+查看 journald 收集的内核日志：
+
+```bash
+journalctl -k
+```
+
+查看本次启动：
+
+```bash
+journalctl -k -b
+```
+
+查看上一次启动：
+
+```bash
+journalctl -k -b -1
+```
+
+跟踪：
+
+```bash
+journalctl -kf
+```
+
+### 3. dmesg 与 journalctl -k 区别
+
+| 命令 | 来源 | 是否可查历史启动 | 特点 |
+| :--- | :--- | :--- | :--- |
+| `dmesg -T` | 内核 ring buffer | 不可查历史启动 | 偏底层、即时、容量有限 |
+| `journalctl -k` | journald 收集的内核日志 | 可查，取决于 journal 持久化 | 便于过滤、关联、持久保存 |
+
+理解：
+
+```text
+dmesg：看内核当前内存缓冲区。
+journalctl -k：看 journald 收集后的内核日志，可能在内存，也可能落盘。
+```
+
+------
+
+## 第五章：GRUB 与内核启动
+
+Linux 启动简化流程：
+
+```text
+BIOS/UEFI
+  -> Bootloader GRUB
+  -> 加载 kernel 和 initramfs
+  -> 挂载根文件系统
+  -> 启动 systemd
+  -> 进入默认 target
+```
+
+### 1. `/boot` 目录
+
+查看：
+
+```bash
+ls -lh /boot
+```
+
+常见文件：
+
+| 文件 | 含义 |
+| :--- | :--- |
+| `vmlinuz-*` | 压缩后的 Linux 内核镜像 |
+| `initrd.img-*` | initramfs 镜像 |
+| `config-*` | 内核配置 |
+| `System.map-*` | 内核符号表 |
+| `grub/` | GRUB 配置目录 |
+
+### 2. GRUB 配置文件
+
+管理员通常修改：
+
+```text
+/etc/default/grub
+```
+
+不要手工直接改：
+
+```text
+/boot/grub/grub.cfg
+```
+
+因为它是生成文件。
+
+修改后更新：
+
+```bash
+sudo update-grub
+```
+
+### 3. 修改内核启动参数
+
+编辑：
+
+```bash
+sudo vim /etc/default/grub
+```
+
+找到：
+
+```text
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
+```
+
+例如去掉安静启动：
+
+```text
+GRUB_CMDLINE_LINUX_DEFAULT=""
+```
+
+更新：
+
+```bash
+sudo update-grub
+sudo reboot
+```
+
+查看是否生效：
+
+```bash
+cat /proc/cmdline
+```
+
+### 4. initramfs
+
+initramfs 是启动早期使用的临时根文件系统。
+
+作用：
+
+- 加载磁盘、文件系统、LVM、RAID、加密盘等驱动。
+- 找到真正的根文件系统。
+- 切换到真实根文件系统继续启动。
+
+更新 initramfs：
+
+```bash
+sudo update-initramfs -u
+```
+
+为所有内核更新：
+
+```bash
+sudo update-initramfs -u -k all
+```
+
+如果磁盘驱动、LVM、加密配置变更，有时需要更新 initramfs。
+
+------
+
+## 第六章：内核参数 sysctl
+
+sysctl 用于查看和修改运行时内核参数。
+
+### 1. 参数来源
+
+很多 sysctl 参数对应 `/proc/sys` 下的文件。
+
+例如：
+
+```bash
+cat /proc/sys/net/ipv4/ip_forward
+```
+
+等价于：
+
+```bash
+sysctl net.ipv4.ip_forward
+```
+
+点号对应目录层级：
+
+```text
+net.ipv4.ip_forward
+对应
+/proc/sys/net/ipv4/ip_forward
+```
+
+### 2. 临时修改
+
+```bash
+sudo sysctl -w net.ipv4.ip_forward=1
+```
+
+或：
+
+```bash
+echo 1 | sudo tee /proc/sys/net/ipv4/ip_forward
+```
+
+### 3. 永久修改
+
+```bash
+sudo vim /etc/sysctl.d/99-custom.conf
+```
+
+写入：
+
+```text
+net.ipv4.ip_forward = 1
+vm.swappiness = 10
+```
+
+加载：
+
+```bash
+sudo sysctl --system
+```
+
+### 4. 常见场景
+
+容器和 Kubernetes 常见：
+
+```text
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv4.ip_forward = 1
+```
+
+查看：
+
+```bash
+sysctl net.bridge.bridge-nf-call-iptables
+sysctl net.ipv4.ip_forward
+```
+
+如果 `net.bridge.*` 不存在，可能需要加载模块：
+
+```bash
+sudo modprobe br_netfilter
+```
+
+------
+
+## 第七章：内核升级与回退
+
+### 1. Ubuntu 查看已安装内核
+
+```bash
+dpkg -l | grep 'linux-image'
+```
+
+查看当前运行内核：
+
+```bash
+uname -r
+```
+
+### 2. Ubuntu 升级内核
+
+普通升级：
+
+```bash
+sudo apt update
+sudo apt upgrade
+```
+
+只安装内核相关更新：
+
+```bash
+sudo apt install linux-generic
+```
+
+云服务器可能使用云内核：
+
+```bash
+sudo apt install linux-virtual
+```
+
+安装后重启：
+
+```bash
+sudo reboot
+```
+
+确认：
+
+```bash
+uname -r
+```
+
+### 3. 回退内核
+
+如果新内核启动异常，可以在 GRUB 菜单中选择：
+
+```text
+Advanced options for Ubuntu
+```
+
+然后选择旧内核启动。
+
+进入系统后，可以临时保留旧内核，不要急着删除。
+
+查看 GRUB 菜单项：
+
+```bash
+grep "menuentry " /boot/grub/grub.cfg
+```
+
+### 4. 清理旧内核
+
+Ubuntu 自动清理无用包：
+
+```bash
+sudo apt autoremove
+```
+
+注意：
+
+- 至少保留一个可用旧内核。
+- 不要手动乱删 `/boot/vmlinuz-*` 和 `initrd.img-*`。
+- `/boot` 空间不足时再清理旧内核。
+
+------
+
+## 第八章：内核排障流程
+
+### 1. 系统启动失败
+
+排查思路：
+
+1. GRUB 是否出现。
+2. 是否能选择旧内核。
+3. 是否卡在 initramfs。
+4. 根分区 UUID 是否正确。
+5. `/etc/fstab` 是否写错。
+6. 是否是驱动或内核模块问题。
+
+常用命令：
+
+```bash
+cat /proc/cmdline
+blkid
+cat /etc/fstab
+journalctl -xb
+```
+
+### 2. 硬件或驱动异常
+
+```bash
+dmesg -T | grep -i error
+journalctl -k -b | grep -i fail
+lspci
+lsusb
+lsmod
+modinfo 模块名
+```
+
+### 3. 文件系统异常
+
+常见日志：
+
+```text
+EXT4-fs error
+XFS metadata corruption
+Buffer I/O error
+```
+
+排查：
+
+```bash
+dmesg -T
+journalctl -k
+mount
+df -h
+lsblk -f
+```
+
+文件系统检查要谨慎，通常不能对已挂载的可写文件系统直接修复。
+
+### 4. OOM 问题
+
+查看内核是否杀进程：
+
+```bash
+journalctl -k | grep -i 'out of memory'
+journalctl -k | grep -i 'killed process'
+```
+
+常见表现：
+
+- 服务突然退出。
+- 日志中出现 `Killed process`。
+- 容器状态为 OOMKilled。
+
+处理思路：
+
+1. 找到被杀进程。
+2. 分析内存增长原因。
+3. 调整服务内存限制。
+4. 增加内存或 swap。
+5. 优化程序内存使用。
+
+### 5. 网络栈问题
+
+```bash
+ip addr
+ip route
+ss -s
+sysctl net.ipv4.ip_forward
+dmesg -T | grep -i net
+```
+
+如果和容器网络有关，还要检查：
+
+```bash
+lsmod | grep br_netfilter
+sysctl net.bridge.bridge-nf-call-iptables
+iptables -t nat -L -n -v
+```
+
+------
+
+## 🔧 内核常用命令汇总
+
+```bash
+# 版本
+uname -r
+uname -a
+cat /etc/os-release
+
+# 启动参数
+cat /proc/cmdline
+ls -lh /boot
+
+# 模块
+lsmod
+modinfo overlay
+sudo modprobe br_netfilter
+sudo modprobe -r br_netfilter
+
+# 日志
+dmesg -T
+dmesg -wT
+journalctl -k
+journalctl -k -b -1
+
+# sysctl
+sysctl -a
+sysctl net.ipv4.ip_forward
+sudo sysctl -w net.ipv4.ip_forward=1
+sudo sysctl --system
+
+# initramfs / grub
+sudo update-initramfs -u
+sudo update-grub
+```
+
+------
+
+## 📌 内核总结要点
+
+1. 内核负责进程、内存、文件系统、网络、驱动等核心功能。
+2. `uname -r` 查看当前运行内核，`/boot` 保存内核镜像和 initramfs。
+3. 内核模块用 `lsmod`、`modinfo`、`modprobe` 管理。
+4. `dmesg` 看内核 ring buffer，`journalctl -k` 看 journald 收集的内核日志。
+5. GRUB 负责加载内核和 initramfs，启动参数可通过 `/etc/default/grub` 修改。
+6. sysctl 是运行时内核参数管理工具，永久配置建议写到 `/etc/sysctl.d/`。
+7. 升级内核后要保留旧内核，方便故障回退。
+8. 内核排障重点看启动参数、模块、内核日志、文件系统和硬件驱动。
+
+
+
+# 备份和恢复
+
+## 第一章：备份和恢复概述
+
+备份的目的不是“拥有一份压缩包”，而是“在故障后能恢复业务”。
+
+常见故障：
+
+1. 误删文件。
+2. 配置改错。
+3. 磁盘损坏。
+4. 系统无法启动。
+5. 数据库损坏。
+6. 勒索软件或恶意删除。
+7. 服务器迁移失败。
+
+备份和恢复要同时设计。
+
+只做备份、不测试恢复，等于没有真正的备份。
+
+### 1. RPO 和 RTO
+
+| 指标 | 含义 | 例子 |
+| :--- | :--- | :--- |
+| RPO | 最多能接受丢失多久的数据 | 最多丢 10 分钟数据 |
+| RTO | 最长能接受多久恢复业务 | 30 分钟内恢复服务 |
+
+如果业务要求：
+
+```text
+RPO = 5 分钟
+RTO = 10 分钟
+```
+
+那么每天一次 `tar` 备份肯定不够，需要更频繁的增量备份、数据库日志备份或主从复制。
+
+### 2. 3-2-1 原则
+
+经典备份原则：
+
+```text
+3 份数据
+2 种不同介质
+1 份异地保存
+```
+
+示例：
+
+- 生产服务器原始数据。
+- 本机备份盘一份。
+- 对象存储或异地服务器一份。
+
+### 3. 备份范围
+
+Linux 服务器常见备份对象：
+
+| 类型 | 示例 |
+| :--- | :--- |
+| 系统配置 | `/etc`、systemd unit、cron、SSH 配置 |
+| 应用代码 | `/opt/app`、`/srv/www` |
+| 应用数据 | 上传文件、附件、静态资源 |
+| 数据库 | MySQL、PostgreSQL、Redis RDB/AOF |
+| 用户数据 | `/home` |
+| 定时任务 | `crontab -l`、`/etc/cron*` |
+| 软件清单 | `dpkg -l`、`rpm -qa` |
+| 分区信息 | `lsblk`、`blkid`、`/etc/fstab` |
+
+不建议完整备份这些目录：
+
+```text
+/proc
+/sys
+/dev
+/run
+/tmp
+/mnt
+/media
+```
+
+这些是运行时虚拟目录或临时挂载点。
+
+------
+
+## 第二章：文件级备份 tar
+
+### 1. 备份目录
+
+```bash
+sudo tar -czf /backup/etc_$(date +%F).tar.gz /etc
+```
+
+参数：
+
+| 参数 | 含义 |
+| :--- | :--- |
+| `-c` | 创建归档 |
+| `-z` | gzip 压缩 |
+| `-f` | 指定文件名 |
+| `-v` | 显示过程 |
+| `-p` | 保留权限 |
+| `--xattrs` | 保留扩展属性 |
+| `--acls` | 保留 ACL |
+
+更完整的备份：
+
+```bash
+sudo tar --xattrs --acls -czpf /backup/etc_$(date +%F).tar.gz /etc
+```
+
+### 2. 排除目录
+
+```bash
+sudo tar -czf /backup/rootfs_$(date +%F).tar.gz \
+  --exclude=/proc \
+  --exclude=/sys \
+  --exclude=/dev \
+  --exclude=/run \
+  --exclude=/tmp \
+  --exclude=/mnt \
+  --exclude=/media \
+  --exclude=/backup \
+  /
+```
+
+注意：备份根文件系统时必须排除备份目标目录，否则可能把备份文件套进备份文件里。
+
+### 3. 查看备份内容
+
+```bash
+tar -tzf /backup/etc_2026-06-21.tar.gz | head
+```
+
+### 4. 恢复文件
+
+恢复到当前目录：
+
+```bash
+tar -xzf /backup/etc_2026-06-21.tar.gz
+```
+
+恢复到指定目录：
+
+```bash
+mkdir /tmp/restore
+tar -xzf /backup/etc_2026-06-21.tar.gz -C /tmp/restore
+```
+
+恢复单个文件：
+
+```bash
+tar -xzf /backup/etc_2026-06-21.tar.gz -C /tmp/restore etc/ssh/sshd_config
+```
+
+生产环境恢复配置时，建议先恢复到临时目录，对比后再覆盖：
+
+```bash
+diff -u /etc/ssh/sshd_config /tmp/restore/etc/ssh/sshd_config
+```
+
+------
+
+## 第三章：文件系统级备份 dump/restore
+
+`dump` 和 `restore` 是传统 Linux/Unix 中用于文件系统级备份和恢复的工具。
+
+它们和 `tar` 的思路不同：
+
+```text
+tar：
+  从目录树角度备份文件。
+  适合普通目录、配置文件、应用代码、跨文件系统打包。
+
+dump：
+  从文件系统角度备份 inode 和数据块。
+  适合对整个 ext 文件系统做完整备份和增量备份。
+```
+
+简单理解：
+
+```text
+tar 更像“把一批文件打包走”。
+dump 更像“按文件系统结构做备份”。
+```
+
+### 1. 适用范围
+
+`dump/restore` 更适合：
+
+- ext2/ext3/ext4 文件系统。
+- 传统系统备份课程和文件系统级备份学习。
+- 需要 0-9 级增量备份的场景。
+- 需要交互式恢复某些文件的场景。
+
+不适合：
+
+- XFS 文件系统，XFS 应使用 `xfsdump/xfsrestore`。
+- Btrfs/ZFS 这类更推荐使用自身快照和 send/receive 的文件系统。
+- 数据库在线热备，数据库应优先使用自身备份工具。
+- 跨不同文件系统做通用目录打包，这种更适合 `tar` 或 `rsync`。
+
+查看文件系统类型：
+
+```bash
+lsblk -f
+df -T
+```
+
+### 2. 分区级增量与目录级备份的区别
+
+`dump` 的增量备份能力主要是为“整个文件系统”设计的。
+
+例如：
+
+```bash
+sudo dump -0u -f /backup/sdb1-level0.dump /dev/sdb1
+sudo dump -1u -f /backup/sdb1-level1.dump /dev/sdb1
+```
+
+这里 `/dev/sdb1` 是一个完整分区，也就是一个完整文件系统。`dump` 可以基于这个文件系统的 inode、元数据、修改时间和 `/etc/dumpdates`，判断哪些内容从上一次低级别备份后发生了变化。
+
+所以这类备份支持 `0-9` 级增量备份。
+
+但是如果只备份普通目录或文件，例如：
+
+```bash
+sudo dump -0f /backup/etc.dump /etc
+```
+
+这就不是对完整文件系统做备份，而是只备份文件系统中的一个目录子集。
+
+这种情况下不适合使用 `dump` 的 `1-9` 级增量模型。可以简单理解为：
+
+```text
+备份分区 / 文件系统：
+  dump 能维护可靠的 0-9 级增量链。
+
+备份普通目录 / 文件：
+  dump 不适合按 0-9 级做增量备份。
+  更推荐使用 tar、rsync 或专门的备份工具。
+```
+
+如果目标是目录级增量备份，常见选择：
+
+```bash
+rsync -a --delete /data/ /backup/data/
+```
+
+或者使用：
+
+- `tar --listed-incremental`
+- `borgbackup`
+- `restic`
+- `duplicity`
+- 文件系统快照
+
+因此要记住：
+
+```text
+dump 的强项是文件系统级备份，不是普通目录级备份。
+```
+
+### 3. 安装 dump
+
+Ubuntu/Debian：
+
+```bash
+sudo apt update
+sudo apt install dump
+```
+
+RHEL/CentOS：
+
+```bash
+sudo yum install dump
+```
+
+或：
+
+```bash
+sudo dnf install dump
+```
+
+查看命令：
+
+```bash
+which dump
+which restore
+```
+
+### 4. dump 备份级别
+
+`dump` 支持 `0-9` 级备份。
+
+| 级别 | 含义 |
+| :--- | :--- |
+| `0` | 完整备份，备份整个文件系统 |
+| `1-9` | 增量备份，备份比更低级别备份之后变化的内容 |
+
+典型策略：
+
+```text
+周日：0 级完整备份
+周一：1 级增量备份
+周二：2 级增量备份
+周三：3 级增量备份
+...
+```
+
+也可以使用更简单的策略：
+
+```text
+周日：0 级完整备份
+周一到周六：1 级增量备份
+```
+
+### 5. dump 级别计算规则
+
+`dump` 的级别不是手动指定“上一个备份文件”，而是指定“这次备份是什么级别”。
+
+真正的增量范围由 `dump` 根据 `/etc/dumpdates` 自动计算。
+
+核心规则：
+
+```text
+N 级备份，会备份自最近一次“小于 N 级”的备份以来变化过的内容。
+```
+
+也就是说：
+
+```text
+0 级：完整备份，备份整个文件系统。
+1 级：参考最近一次 0 级备份。
+2 级：参考最近一次 0 或 1 级备份。
+3 级：参考最近一次 0、1 或 2 级备份。
+```
+
+`dump -u` 会把备份记录写入：
+
+```text
+/etc/dumpdates
+```
+
+示例：
+
+```bash
+sudo dump -0u -f /backup/sdb1-level0.dump /dev/sdb1
+sudo dump -1u -f /backup/sdb1-level1.dump /dev/sdb1
+sudo dump -2u -f /backup/sdb1-level2.dump /dev/sdb1
+```
+
+`/etc/dumpdates` 中会记录某个文件系统在什么时候做过几级备份。后续再做增量备份时，`dump` 会根据这个文件判断从哪个时间点开始备份变化内容。
+
+#### 情况一：级别递增
+
+```text
+周日：0 级
+周一：1 级
+周二：2 级
+周三：3 级
+```
+
+含义：
+
+```text
+周日 0 级：备份全部内容。
+周一 1 级：备份周日 0 级之后变化的内容。
+周二 2 级：备份周一 1 级之后变化的内容。
+周三 3 级：备份周二 2 级之后变化的内容。
+```
+
+这种方式节省空间，但恢复时链条更长：
+
+```text
+先恢复 0
+再恢复 1
+再恢复 2
+再恢复 3
+```
+
+#### 情况二：连续使用同一级别
+
+```text
+周日：0 级
+周一：1 级
+周二：1 级
+周三：1 级
+```
+
+因为 `1` 级只会参考最近一次“小于 1 级”的备份，也就是 `0` 级，所以：
+
+```text
+周一 1 级：备份周日 0 级之后变化的内容。
+周二 1 级：仍然备份周日 0 级之后变化的内容。
+周三 1 级：仍然备份周日 0 级之后变化的内容。
+```
+
+这种更像“差异备份”。
+
+恢复时只需要：
+
+```text
+恢复 0 级
+再恢复目标日期对应的 1 级
+```
+
+#### 情况三：连续两次指定 2 级
+
+```text
+周日：0 级
+周一：1 级
+周二：2 级
+周三：2 级
+```
+
+这里要特别注意：
+
+```text
+周二 2 级：备份周一 1 级之后变化的内容。
+周三 2 级：仍然备份周一 1 级之后变化的内容。
+```
+
+原因是：
+
+```text
+2 级备份只会参考最近一次“小于 2 级”的备份。
+前一次 2 级不会成为下一次 2 级的基准。
+```
+
+所以连续两次 `2` 级，并不是第二次基于第一次继续增量，而是两次都基于最近的 `0` 或 `1` 级。
+
+总结：
+
+```text
+备份时：
+  管理员指定本次备份级别。
+  dump 根据 /etc/dumpdates 自动计算增量范围。
+
+恢复时：
+  管理员必须按备份链路手动选择文件并按顺序恢复。
+```
+
+### 6. 完整备份
+
+假设要备份 `/dev/sdb1`：
+
+```bash
+sudo dump -0u -f /backup/sdb1-level0.dump /dev/sdb1
+```
+
+参数说明：
+
+| 参数 | 含义 |
+| :--- | :--- |
+| `-0` | 0 级完整备份 |
+| `-u` | 备份完成后更新 `/etc/dumpdates` |
+| `-f` | 指定输出文件 |
+
+查看备份记录：
+
+```bash
+cat /etc/dumpdates
+```
+
+注意：
+
+```text
+dump 通常建议针对设备或文件系统备份，例如 /dev/sdb1。
+不要把 /proc、/sys、/dev 这类虚拟文件系统当普通目录备份。
+```
+
+### 7. 增量备份
+
+做 1 级增量备份：
+
+```bash
+sudo dump -1u -f /backup/sdb1-level1.dump /dev/sdb1
+```
+
+再做 2 级增量备份：
+
+```bash
+sudo dump -2u -f /backup/sdb1-level2.dump /dev/sdb1
+```
+
+恢复时要按顺序恢复：
+
+```text
+先恢复 0 级完整备份
+再恢复 1 级增量备份
+再恢复 2 级增量备份
+```
+
+顺序错了，恢复结果就可能不完整。
+
+### 8. 查看备份内容
+
+```bash
+sudo restore -t -f /backup/sdb1-level0.dump
+```
+
+含义：
+
+- `-t`：列出备份内容。
+- `-f`：指定备份文件。
+
+### 9. 完整恢复
+
+准备恢复目录：
+
+```bash
+sudo mkdir -p /restore/sdb1
+cd /restore/sdb1
+```
+
+恢复完整备份：
+
+```bash
+sudo restore -r -f /backup/sdb1-level0.dump
+```
+
+如果还有增量备份，继续按顺序恢复：
+
+```bash
+sudo restore -r -f /backup/sdb1-level1.dump
+sudo restore -r -f /backup/sdb1-level2.dump
+```
+
+参数说明：
+
+| 参数 | 含义 |
+| :--- | :--- |
+| `-r` | 重建整个文件系统内容 |
+| `-f` | 指定备份文件 |
+
+实际灾难恢复时，通常流程是：
+
+1. 创建新分区。
+2. 格式化成相同或兼容文件系统。
+3. 挂载到临时目录。
+4. 进入挂载点。
+5. 执行 `restore -r`。
+6. 检查 `/etc/fstab`、权限、启动配置。
+
+### 10. 交互式恢复
+
+交互式恢复适合只恢复部分文件。
+
+```bash
+sudo restore -i -f /backup/sdb1-level0.dump
+```
+
+进入 `restore>` 交互界面后，常用命令：
+
+```text
+ls        查看备份内文件
+cd        切换目录
+pwd       查看当前位置
+add       标记要恢复的文件或目录
+delete    取消标记
+extract   恢复已标记内容
+quit      退出
+```
+
+示例流程：
+
+```text
+restore > ls
+restore > cd etc
+restore > ls
+restore > add ssh
+restore > extract
+restore > quit
+```
+
+这会把备份中的 `etc/ssh` 恢复到当前目录下。
+
+### 11. dump/restore 与 xfsdump/xfsrestore
+
+如果文件系统是 XFS，不应该使用 `dump/restore`，而应使用：
+
+```bash
+sudo xfsdump -f /backup/data.xfsdump /data
+```
+
+恢复：
+
+```bash
+sudo xfsrestore -f /backup/data.xfsdump /restore/data
+```
+
+查看文件系统类型：
+
+```bash
+df -T /data
+```
+
+如果输出是：
+
+```text
+xfs
+```
+
+优先使用 `xfsdump/xfsrestore`。
+
+### 12. dump/restore 的使用建议
+
+现在很多生产环境已经不把 `dump/restore` 作为首选备份工具。
+
+原因：
+
+- 只适合部分文件系统。
+- 对在线业务一致性要求较高时不如快照加专用备份工具。
+- 数据库场景必须配合数据库自身机制。
+- 运维体系中更常见的是 `rsync`、快照、对象存储、专用备份软件。
+
+但是它仍然值得学习：
+
+- 能理解文件系统级备份。
+- 能理解完整备份和增量备份。
+- 能训练灾难恢复流程。
+- 在传统 Linux 教材和考试中经常出现。
+
+------
+
+## 第四章：同步备份 rsync
+
+`rsync` 适合目录同步和增量复制。
+
+### 1. 本地同步
+
+```bash
+rsync -av /data/ /backup/data/
+```
+
+注意：
+
+```text
+/data/  表示同步 data 目录里面的内容
+/data   表示同步 data 这个目录本身
+```
+
+### 2. 删除目标端多余文件
+
+```bash
+rsync -av --delete /data/ /backup/data/
+```
+
+`--delete` 很危险，目标端有但源端没有的文件会被删除。
+
+建议先演练：
+
+```bash
+rsync -av --delete --dry-run /data/ /backup/data/
+```
+
+### 3. 远程同步
+
+```bash
+rsync -avz /data/ backup@192.168.10.20:/backup/data/
+```
+
+从远程拉取：
+
+```bash
+rsync -avz backup@192.168.10.20:/backup/data/ /data/
+```
+
+### 4. 保留权限和特殊属性
+
+```bash
+sudo rsync -aHAX --numeric-ids /data/ /backup/data/
+```
+
+参数：
+
+| 参数 | 含义 |
+| :--- | :--- |
+| `-a` | 归档模式，保留基本属性 |
+| `-H` | 保留硬链接 |
+| `-A` | 保留 ACL |
+| `-X` | 保留扩展属性 |
+| `--numeric-ids` | 按 UID/GID 数字保留属主 |
+
+------
+
+## 第五章：数据库备份
+
+数据库不能只靠复制数据目录。
+
+运行中的数据库有缓存、事务、日志、锁，直接复制数据文件可能不一致。
+
+### 1. MySQL 逻辑备份
+
+备份单库：
+
+```bash
+mysqldump -uroot -p --single-transaction --routines --triggers dbname > dbname.sql
+```
+
+备份所有库：
+
+```bash
+mysqldump -uroot -p --all-databases --single-transaction --routines --triggers > all.sql
+```
+
+压缩：
+
+```bash
+mysqldump -uroot -p --single-transaction dbname | gzip > dbname_$(date +%F).sql.gz
+```
+
+恢复：
+
+```bash
+mysql -uroot -p dbname < dbname.sql
+```
+
+压缩文件恢复：
+
+```bash
+gunzip -c dbname_2026-06-21.sql.gz | mysql -uroot -p dbname
+```
+
+说明：
+
+- `--single-transaction` 适合 InnoDB，尽量减少锁表。
+- MyISAM 等非事务表不能完全依赖它。
+- 大库逻辑备份恢复慢，需要考虑物理备份或主从复制。
+
+### 2. PostgreSQL 逻辑备份
+
+备份单库：
+
+```bash
+pg_dump -U postgres -F c -f dbname.dump dbname
+```
+
+恢复：
+
+```bash
+pg_restore -U postgres -d dbname dbname.dump
+```
+
+备份所有库：
+
+```bash
+pg_dumpall -U postgres > all.sql
+```
+
+恢复：
+
+```bash
+psql -U postgres -f all.sql
+```
+
+### 3. Redis 备份
+
+Redis 常见持久化：
+
+- RDB：快照文件，通常是 `dump.rdb`。
+- AOF：追加日志，记录写命令。
+
+查看配置：
+
+```bash
+redis-cli CONFIG GET dir
+redis-cli CONFIG GET dbfilename
+redis-cli CONFIG GET appendonly
+```
+
+触发 RDB：
+
+```bash
+redis-cli BGSAVE
+```
+
+备份时要确认 RDB 或 AOF 文件完整，并注意 Redis 版本兼容。
+
+------
+
+## 第六章：磁盘和分区级备份
+
+### 1. 查看磁盘信息
+
+```bash
+lsblk
+lsblk -f
+blkid
+df -h
+```
+
+备份分区表：
+
+```bash
+sudo sfdisk -d /dev/sda > /backup/sda.part
+```
+
+恢复分区表：
+
+```bash
+sudo sfdisk /dev/sda < /backup/sda.part
+```
+
+恢复分区表非常危险，必须确认目标磁盘正确。
+
+### 2. dd 镜像备份
+
+备份整盘：
+
+```bash
+sudo dd if=/dev/sda of=/backup/sda.img bs=64M status=progress
+```
+
+恢复整盘：
+
+```bash
+sudo dd if=/backup/sda.img of=/dev/sda bs=64M status=progress
+```
+
+备份并压缩：
+
+```bash
+sudo dd if=/dev/sda bs=64M status=progress | gzip > /backup/sda.img.gz
+```
+
+恢复压缩镜像：
+
+```bash
+gunzip -c /backup/sda.img.gz | sudo dd of=/dev/sda bs=64M status=progress
+```
+
+注意：
+
+- `dd` 不理解文件系统，只按块复制。
+- 源盘多大，镜像通常就多大。
+- `if` 和 `of` 写反会造成严重数据丢失。
+- 更适合系统迁移、磁盘克隆、灾难恢复镜像。
+
+### 3. LVM 快照
+
+LVM 快照适合在备份时获得某一时刻的数据视图。
+
+查看：
+
+```bash
+lvs
+vgs
+```
+
+创建快照：
+
+```bash
+sudo lvcreate -L 5G -s -n data_snap /dev/vg0/data
+```
+
+挂载快照：
+
+```bash
+sudo mkdir /mnt/data_snap
+sudo mount /dev/vg0/data_snap /mnt/data_snap
+```
+
+备份快照：
+
+```bash
+sudo tar -czf /backup/data_$(date +%F).tar.gz -C /mnt/data_snap .
+```
+
+卸载并删除快照：
+
+```bash
+sudo umount /mnt/data_snap
+sudo lvremove /dev/vg0/data_snap
+```
+
+注意：
+
+- 快照空间不足会失效。
+- 快照不是长期备份，不能替代异地备份。
+- 数据库仍建议配合数据库自身备份机制。
+
+------
+
+## 第七章：系统配置备份清单
+
+服务器改配置前，建议先做基础配置备份。
+
+### 1. 备份关键目录
+
+```bash
+sudo mkdir -p /backup/system
+sudo tar --xattrs --acls -czpf /backup/system/etc_$(date +%F).tar.gz /etc
+```
+
+### 2. 备份软件包列表
+
+Ubuntu/Debian：
+
+```bash
+dpkg --get-selections > /backup/system/dpkg-selections.txt
+apt-mark showmanual > /backup/system/apt-manual.txt
+```
+
+恢复软件选择状态：
+
+```bash
+sudo dpkg --set-selections < /backup/system/dpkg-selections.txt
+sudo apt-get dselect-upgrade
+```
+
+RHEL/CentOS：
+
+```bash
+rpm -qa > /backup/system/rpm-list.txt
+```
+
+### 3. 备份定时任务
+
+当前用户：
+
+```bash
+crontab -l > /backup/system/crontab_$(whoami).txt
+```
+
+root：
+
+```bash
+sudo crontab -l > /backup/system/crontab_root.txt
+```
+
+系统 cron：
+
+```bash
+sudo tar -czf /backup/system/cron_$(date +%F).tar.gz /etc/cron* /var/spool/cron 2>/dev/null
+```
+
+### 4. 备份磁盘和挂载信息
+
+```bash
+lsblk -f > /backup/system/lsblk.txt
+blkid > /backup/system/blkid.txt
+df -hT > /backup/system/df.txt
+cp /etc/fstab /backup/system/fstab
+```
+
+### 5. 备份网络信息
+
+```bash
+ip addr > /backup/system/ip_addr.txt
+ip route > /backup/system/ip_route.txt
+ss -lntup > /backup/system/ports.txt
+```
+
+------
+
+## 第八章：自动备份脚本示例
+
+### 1. 文件备份脚本
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+backup_root="/backup"
+date_str=$(date +%F_%H%M%S)
+dest="$backup_root/system_$date_str"
+
+mkdir -p "$dest"
+
+tar --xattrs --acls -czpf "$dest/etc.tar.gz" /etc
+dpkg --get-selections > "$dest/dpkg-selections.txt" 2>/dev/null || true
+apt-mark showmanual > "$dest/apt-manual.txt" 2>/dev/null || true
+lsblk -f > "$dest/lsblk.txt"
+blkid > "$dest/blkid.txt"
+df -hT > "$dest/df.txt"
+ip addr > "$dest/ip_addr.txt"
+ip route > "$dest/ip_route.txt"
+
+find "$backup_root" -maxdepth 1 -type d -name 'system_*' -mtime +7 -exec rm -rf {} \;
+
+echo "backup done: $dest"
+```
+
+保存：
+
+```bash
+sudo vim /usr/local/sbin/system-backup.sh
+sudo chmod +x /usr/local/sbin/system-backup.sh
+```
+
+手动执行：
+
+```bash
+sudo /usr/local/sbin/system-backup.sh
+```
+
+### 2. 配置 cron 定时执行
+
+```bash
+sudo crontab -e
+```
+
+每天凌晨 2 点执行：
+
+```text
+0 2 * * * /usr/local/sbin/system-backup.sh >> /var/log/system-backup.log 2>&1
+```
+
+### 3. MySQL 备份脚本示例
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+backup_dir="/backup/mysql"
+date_str=$(date +%F_%H%M%S)
+db_name="appdb"
+
+mkdir -p "$backup_dir"
+
+mysqldump --defaults-extra-file=/root/.my.cnf \
+  --single-transaction \
+  --routines \
+  --triggers \
+  "$db_name" | gzip > "$backup_dir/${db_name}_${date_str}.sql.gz"
+
+find "$backup_dir" -type f -name "${db_name}_*.sql.gz" -mtime +14 -delete
+```
+
+`/root/.my.cnf` 示例：
+
+```ini
+[client]
+user=root
+password=your_password
+```
+
+权限：
+
+```bash
+sudo chmod 600 /root/.my.cnf
+```
+
+------
+
+## 第九章：恢复场景实战
+
+### 1. 恢复误删配置文件
+
+假设误删：
+
+```bash
+sudo rm /etc/nginx/nginx.conf
+```
+
+先恢复到临时目录：
+
+```bash
+mkdir /tmp/restore
+tar -xzf /backup/system/etc_2026-06-21.tar.gz -C /tmp/restore etc/nginx/nginx.conf
+```
+
+对比：
+
+```bash
+sudo diff -u /etc/nginx/nginx.conf /tmp/restore/etc/nginx/nginx.conf
+```
+
+复制回去：
+
+```bash
+sudo cp /tmp/restore/etc/nginx/nginx.conf /etc/nginx/nginx.conf
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### 2. 恢复 crontab
+
+```bash
+crontab /backup/system/crontab_ubuntu.txt
+```
+
+root：
+
+```bash
+sudo crontab /backup/system/crontab_root.txt
+```
+
+验证：
+
+```bash
+crontab -l
+sudo crontab -l
+```
+
+### 3. `/etc/fstab` 写错无法启动
+
+典型现象：
+
+- 系统卡在 emergency mode。
+- 提示某个挂载点失败。
+
+处理：
+
+1. 输入 root 密码进入 emergency shell。
+2. 重新挂载根分区为可写：
+
+```bash
+mount -o remount,rw /
+```
+
+3. 编辑 fstab：
+
+```bash
+vim /etc/fstab
+```
+
+4. 测试：
+
+```bash
+mount -a
+```
+
+5. 没报错再重启：
+
+```bash
+reboot
+```
+
+经验：
+
+```text
+每次修改 /etc/fstab 后，都要先执行 mount -a 测试。
+```
+
+### 4. GRUB 损坏恢复思路
+
+使用 Live CD 或救援模式启动后，挂载系统：
+
+```bash
+sudo mount /dev/sda2 /mnt
+sudo mount /dev/sda1 /mnt/boot/efi
+sudo mount --bind /dev /mnt/dev
+sudo mount --bind /proc /mnt/proc
+sudo mount --bind /sys /mnt/sys
+```
+
+进入系统：
+
+```bash
+sudo chroot /mnt
+```
+
+重装 GRUB：
+
+```bash
+grub-install /dev/sda
+update-grub
+```
+
+退出并重启：
+
+```bash
+exit
+reboot
+```
+
+注意：UEFI 和 BIOS 模式命令细节不同，实际操作前要确认磁盘、EFI 分区和启动模式。
+
+### 5. 系统迁移基础流程
+
+迁移一台 Linux 服务器时，通常需要：
+
+1. 记录原系统版本和内核：
+
+```bash
+cat /etc/os-release
+uname -a
+```
+
+2. 记录磁盘和挂载：
+
+```bash
+lsblk -f
+cat /etc/fstab
+```
+
+3. 备份配置：
+
+```bash
+tar --xattrs --acls -czpf etc.tar.gz /etc
+```
+
+4. 备份应用和数据：
+
+```bash
+rsync -aHAX /opt/app/ backup:/backup/app/
+```
+
+5. 备份数据库。
+6. 在新机器安装相同或兼容版本软件。
+7. 恢复配置和数据。
+8. 修改 IP、主机名、DNS、证书路径等环境相关配置。
+9. 启动服务并验证。
+10. 切换流量前做最终增量同步。
+
+------
+
+## 第十章：备份验证
+
+备份是否可靠，要靠恢复验证。
+
+### 1. 校验备份文件
+
+生成 checksum：
+
+```bash
+sha256sum etc_2026-06-21.tar.gz > etc_2026-06-21.tar.gz.sha256
+```
+
+验证：
+
+```bash
+sha256sum -c etc_2026-06-21.tar.gz.sha256
+```
+
+### 2. 测试解压
+
+```bash
+mkdir /tmp/test-restore
+tar -tzf etc_2026-06-21.tar.gz >/dev/null
+tar -xzf etc_2026-06-21.tar.gz -C /tmp/test-restore
+```
+
+### 3. 数据库恢复演练
+
+建议定期在测试库恢复：
+
+```bash
+createdb restore_test
+pg_restore -d restore_test dbname.dump
+```
+
+或 MySQL：
+
+```bash
+mysql -uroot -p -e "CREATE DATABASE restore_test"
+gunzip -c appdb.sql.gz | mysql -uroot -p restore_test
+```
+
+### 4. 恢复文档
+
+备份目录中建议保存说明：
+
+```text
+README.restore
+```
+
+内容包括：
+
+- 备份时间。
+- 备份来源。
+- 备份内容。
+- 恢复命令。
+- 依赖软件版本。
+- 注意事项。
+
+------
+
+## 第十一章：备份安全
+
+备份文件往往比生产系统更危险。
+
+原因：
+
+- 包含数据库。
+- 包含密钥和证书。
+- 包含用户信息。
+- 包含配置密码。
+
+### 1. 权限控制
+
+```bash
+sudo chown -R root:root /backup
+sudo chmod 700 /backup
+```
+
+数据库备份：
+
+```bash
+sudo chmod 600 /backup/mysql/*.sql.gz
+```
+
+### 2. 加密备份
+
+使用 gpg 对称加密：
+
+```bash
+gpg -c etc_2026-06-21.tar.gz
+```
+
+生成：
+
+```text
+etc_2026-06-21.tar.gz.gpg
+```
+
+解密：
+
+```bash
+gpg -o etc_2026-06-21.tar.gz -d etc_2026-06-21.tar.gz.gpg
+```
+
+注意：
+
+- 密码丢失就无法恢复。
+- 密码不要和备份文件放在同一台机器上。
+
+### 3. 远程备份账号限制
+
+建议为备份创建专用账号：
+
+```bash
+sudo useradd -m -s /usr/sbin/nologin backup
+```
+
+如果要使用 SSH rsync，可使用受限 key、专用目录、最小权限。
+
+### 4. 防止备份被一起删除
+
+如果备份目录一直挂载在生产机上，误操作或攻击可能连备份一起删除。
+
+更稳妥：
+
+- 备份完成后同步到远端。
+- 远端开启只追加或对象锁。
+- 使用快照或版本化对象存储。
+- 备份账号只有写入权限，没有删除权限。
+
+------
+
+## 🔧 备份和恢复命令汇总
+
+```bash
+# tar
+tar -czf backup.tar.gz /data
+tar -tzf backup.tar.gz
+tar -xzf backup.tar.gz -C /restore
+
+# dump / restore
+dump -0u -f /backup/sdb1-level0.dump /dev/sdb1
+dump -1u -f /backup/sdb1-level1.dump /dev/sdb1
+restore -t -f /backup/sdb1-level0.dump
+restore -i -f /backup/sdb1-level0.dump
+restore -r -f /backup/sdb1-level0.dump
+
+# xfsdump / xfsrestore
+xfsdump -f /backup/data.xfsdump /data
+xfsrestore -f /backup/data.xfsdump /restore/data
+
+# rsync
+rsync -av /data/ /backup/data/
+rsync -av --delete --dry-run /data/ /backup/data/
+rsync -aHAX --numeric-ids /data/ /backup/data/
+
+# MySQL
+mysqldump --single-transaction dbname > dbname.sql
+mysql dbname < dbname.sql
+
+# PostgreSQL
+pg_dump -F c -f dbname.dump dbname
+pg_restore -d dbname dbname.dump
+
+# 磁盘信息
+lsblk -f
+blkid
+df -hT
+sfdisk -d /dev/sda > sda.part
+
+# dd
+dd if=/dev/sda of=/backup/sda.img bs=64M status=progress
+dd if=/backup/sda.img of=/dev/sda bs=64M status=progress
+
+# 校验
+sha256sum file > file.sha256
+sha256sum -c file.sha256
+```
+
+------
+
+## 📌 备份和恢复总结要点
+
+1. 备份的最终目标是恢复，不是生成文件。
+2. 设计备份前先明确 RPO 和 RTO。
+3. 重要数据遵循 3-2-1 原则。
+4. 文件备份可用 `tar`，目录同步可用 `rsync`，磁盘镜像可用 `dd`。
+5. ext 文件系统可以了解 `dump/restore`，XFS 应使用 `xfsdump/xfsrestore`。
+6. 数据库优先使用数据库自身的备份工具。
+7. 备份 `/etc`、定时任务、软件包列表、磁盘挂载信息，能大幅降低系统恢复难度。
+8. 恢复配置前先解压到临时目录，对比后再覆盖。
+9. `/etc/fstab` 修改后必须执行 `mount -a` 验证。
+10. 定期做恢复演练，确认备份真的可用。
+11. 备份文件要做权限控制、加密和异地保存。
