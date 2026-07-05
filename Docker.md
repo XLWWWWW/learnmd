@@ -1364,6 +1364,668 @@ Docker Container: 容器就是镜像运行提供服务的
 
 
 
+### Distroless 运行时镜像
+
+Distroless 是一类极简运行时镜像。它只放应用运行所需的依赖，不放普通 Linux 发行版里常见的 shell、包管理器、curl、vim、ps 等工具。
+
+官方仓库：<https://github.com/GoogleContainerTools/distroless>
+
+它适合放在多阶段构建的最后一层：
+
+```dockerfile
+FROM golang:1.26 AS builder
+WORKDIR /src
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -o /out/server main.go
+
+FROM gcr.io/distroless/static-debian13
+COPY --from=builder /out/server /server
+CMD ["/server"]
+```
+
+#### 核心特点
+
+1、体积小。只包含运行程序所需的最小文件。
+
+2、攻击面小。没有 shell 和包管理器，容器被攻破后也少了很多可利用工具。
+
+3、调试不方便。普通 tag 不能 `docker exec -it 容器 sh`，因为镜像里没有 `sh`。
+
+4、适合多阶段构建。builder 阶段负责编译、下载依赖、chmod、整理文件；distroless 阶段只负责运行。
+
+#### 常见镜像的区别
+
+| 镜像 | 适合场景 | 主要包含内容 |
+| --- | --- | --- |
+| `gcr.io/distroless/static-debian13` | 完全静态链接的二进制 | 最小运行环境、CA 证书、基础用户信息；不提供 glibc 动态链接环境 |
+| `gcr.io/distroless/base-debian13` | 需要 glibc 的动态链接程序 | 在 `static` 基础上增加 glibc、动态链接器和基础系统库 |
+| `gcr.io/distroless/base-nossl-debian13` | 需要 glibc，但不需要 TLS/证书的程序 | 类似 `base`，但去掉 SSL/CA 相关内容 |
+| `gcr.io/distroless/cc-debian13` | C/C++ 程序，或依赖 C++ runtime 的程序 | 在 `base` 基础上增加 C/C++ 运行时库，例如 `libstdc++` |
+| `gcr.io/distroless/java17-debian13` / `java21-debian13` | Java 应用 | 对应版本的 Java runtime |
+| `gcr.io/distroless/nodejs22-debian13` / `nodejs24-debian13` | Node.js 应用 | 对应版本的 Node.js runtime |
+| `gcr.io/distroless/python3-debian13` | Python 应用 | Python 运行时 |
+
+`static`、`base`、`cc` 是通用运行时镜像；`java`、`nodejs`、`python3` 是带语言运行时的镜像。
+
+#### tag 的含义
+
+| tag | 含义 |
+| --- | --- |
+| `latest` | 默认版本 |
+| `nonroot` | 默认使用非 root 用户运行 |
+| `debug` | 额外带 busybox shell，方便进入容器排查 |
+| `debug-nonroot` | `debug` + `nonroot` |
+
+建议显式写 Debian 版本：
+
+```dockerfile
+FROM gcr.io/distroless/base-debian13
+```
+
+不要长期依赖：
+
+```dockerfile
+FROM gcr.io/distroless/base
+```
+
+因为不带 Debian 版本的 tag 以后可能跟随默认版本变化，导致构建结果变化。
+
+#### 怎么选镜像
+
+Go 程序常用规则：
+
+| 构建方式 | 推荐运行时镜像 | 原因 |
+| --- | --- | --- |
+| `CGO_ENABLED=0` | `static-debian13` | Go 二进制完全静态链接，不需要 glibc |
+| `CGO_ENABLED=1`，只依赖 glibc | `base-debian13` | 需要动态链接器和 glibc |
+| `CGO_ENABLED=1`，依赖 C++ 库 | `cc-debian13` | 还需要 C++ runtime |
+
+如果用的是 sqlite 这类依赖 CGO 的库，通常不能用 `static-debian13`，应该先用：
+
+```dockerfile
+FROM gcr.io/distroless/base-debian13
+```
+
+如果运行时报：
+
+```text
+exec ./server: no such file or directory
+```
+
+不要只理解成 `/app/server` 不存在。还有一种常见原因是：二进制依赖动态链接器，但镜像里没有对应的动态链接器。比如：
+
+```dockerfile
+RUN CGO_ENABLED=1 go build -o server main.go
+FROM gcr.io/distroless/static-debian13
+```
+
+这种组合就容易出问题。解决方向：
+
+```dockerfile
+RUN CGO_ENABLED=0 GOOS=linux go build -o server main.go
+FROM gcr.io/distroless/static-debian13
+```
+
+或者：
+
+```dockerfile
+RUN CGO_ENABLED=1 GOOS=linux go build -o server main.go
+FROM gcr.io/distroless/base-debian13
+```
+
+#### 没有 shell 的影响
+
+distroless 普通镜像里没有 `/bin/sh`，所以最后阶段不要依赖 shell 命令：
+
+```dockerfile
+FROM gcr.io/distroless/base-debian13
+RUN chmod +x /app/server
+```
+
+这种通常会失败，因为 `RUN chmod ...` 默认需要 shell，而且镜像里也没有 `chmod`。
+
+正确做法是在 builder 阶段处理，或者用 `COPY` 的参数：
+
+```dockerfile
+COPY --from=builder --chown=nonroot:nonroot --chmod=755 /app/server /app/server
+```
+
+`CMD` 和 `ENTRYPOINT` 也要使用 exec form：
+
+```dockerfile
+CMD ["/app/server"]
+ENTRYPOINT ["/app/server"]
+```
+
+不要写 shell form：
+
+```dockerfile
+CMD "/app/server"
+ENTRYPOINT "/app/server"
+```
+
+因为 shell form 会尝试通过 shell 解释命令，而 distroless 没有 shell。
+
+#### 文件权限和 nonroot
+
+distroless 里常用：
+
+```dockerfile
+USER nonroot:nonroot
+```
+
+这会让进程以非 root 用户运行，更安全。但只要程序需要写文件，就必须保证文件和目录都可写。
+
+只给文件 chown 不一定够：
+
+```dockerfile
+COPY --from=builder --chown=nonroot:nonroot --chmod=664 /app/visitors.db /app/visitors.db
+```
+
+这只能保证 `visitors.db` 文件本身属于 `nonroot`。如果 `/app` 目录还是 `root:root`，SQLite 可能无法创建：
+
+```text
+visitors.db-journal
+visitors.db-wal
+visitors.db-shm
+```
+
+然后报：
+
+```text
+attempt to write a readonly database
+```
+
+更稳的做法是在 builder 阶段整理运行目录，然后整体复制并 chown：
+
+```dockerfile
+FROM golang:1.26 AS builder
+WORKDIR /src
+
+COPY . .
+RUN CGO_ENABLED=1 GOOS=linux go build -o server main.go
+
+RUN mkdir -p /out/app \
+    && cp -r templates static routes server visitors.db /out/app/
+
+FROM gcr.io/distroless/base-debian13
+
+COPY --from=builder --chown=nonroot:nonroot /out/app /app
+COPY --from=builder --chown=nonroot:nonroot --chmod=755 /out/app/server /app/server
+
+WORKDIR /app
+USER nonroot:nonroot
+
+CMD ["./server"]
+```
+
+如果数据库需要持久化，不建议只写在镜像层里的 `/app/visitors.db`。容器删除后数据也会丢。更常见的是挂载 volume：
+
+```shell
+docker run -v "$(pwd)/data:/app/data" your-image
+```
+
+然后程序打开：
+
+```text
+/app/data/visitors.db
+```
+
+#### 调试 distroless 镜像
+
+生产镜像用普通 tag：
+
+```dockerfile
+FROM gcr.io/distroless/base-debian13
+```
+
+排查问题时临时换 debug tag：
+
+```dockerfile
+FROM gcr.io/distroless/base-debian13:debug
+```
+
+进入容器：
+
+```shell
+docker run --entrypoint=sh -it your-image
+```
+
+查看文件和权限：
+
+```shell
+ls -ld /app
+ls -l /app
+```
+
+如果原来用的是 `:nonroot`，调试时可以换成：
+
+```dockerfile
+FROM gcr.io/distroless/base-debian13:debug-nonroot
+```
+
+
+
+### Python 多阶段构建
+
+参考文章：
+
+> Multi-stage builds #2: Python specifics  
+> Itamar Turner-Trauring，Last updated 13 Sep 2024，originally created 26 Mar 2019
+
+这篇文章讲的是：多阶段构建在 C/Go 这种“编译出单个二进制”的场景里很直观，但放到 Python 里会变复杂。因为 Python 依赖安装后通常不是一个单独文件，而是分散到多个目录里。
+
+#### 多阶段构建的基本思想
+
+普通构建如果在镜像里安装编译器：
+
+```dockerfile
+RUN apt-get install -y gcc build-essential
+RUN pip install -r requirements.txt
+```
+
+最终镜像会把 gcc、头文件、build-essential 等构建工具也带进去，镜像更大，攻击面也更大。
+
+多阶段构建把镜像拆成两个阶段：
+
+1、builder 阶段：安装编译器，编译 C/C++/Rust 扩展，安装依赖。
+
+2、runtime 阶段：只复制运行需要的产物，不复制编译器。
+
+类似这样：
+
+```dockerfile
+FROM ubuntu:24.04 AS compile-image
+RUN apt-get update
+RUN apt-get install -y --no-install-recommends gcc build-essential
+
+WORKDIR /root
+COPY hello.c .
+RUN gcc -o helloworld hello.c
+
+FROM ubuntu:24.04 AS runtime-image
+COPY --from=compile-image /root/helloworld .
+CMD ["./helloworld"]
+```
+
+这里最终镜像只来自最后一个 `FROM`，也就是 `runtime-image`。前面的 `compile-image` 只是临时构建环境。
+
+#### Python 为什么麻烦
+
+C/Go 常见情况是编译出一个二进制：
+
+```text
+/root/helloworld
+```
+
+runtime 阶段复制这个文件就行。
+
+但 Python 执行：
+
+```shell
+pip install -r requirements.txt
+```
+
+可能会把文件放到很多地方：
+
+1、包代码放到 `site-packages`。
+
+2、命令行脚本放到 `/usr/local/bin` 或 `/usr/bin`。
+
+3、`.pth`、metadata、data files 放到其他路径。
+
+4、如果依赖有 C/C++/Rust 扩展，还会生成 `.so` 动态库。
+
+所以不能简单地只复制一个目录，除非先让 pip 把依赖集中安装到一个可复制的位置。
+
+文章给了两个主方案：
+
+1、`pip install --user`
+
+2、`virtualenv`
+
+#### 方案一：pip install --user
+
+`pip install --user` 会把当前用户的 Python 包、脚本等安装到用户目录：
+
+```text
+/root/.local
+```
+
+这样 runtime 阶段只需要复制 `/root/.local`。
+
+示例：
+
+```dockerfile
+FROM python:3.12-slim AS compile-image
+
+RUN apt-get update
+RUN apt-get install -y --no-install-recommends build-essential gcc
+
+COPY requirements.txt .
+RUN pip install --user -r requirements.txt
+
+COPY setup.py .
+COPY myapp/ myapp/
+RUN pip install --user .
+
+FROM python:3.12-slim AS runtime-image
+
+COPY --from=compile-image /root/.local /root/.local
+
+ENV PATH=/root/.local/bin:$PATH
+
+CMD ["myapp"]
+```
+
+注意：
+
+```dockerfile
+ENV PATH=/root/.local/bin:$PATH
+```
+
+这一步很重要。很多 Python 包会安装命令行脚本到：
+
+```text
+/root/.local/bin
+```
+
+不加 `PATH` 的话，`CMD ["myapp"]` 可能找不到命令。
+
+这个方案的优点：
+
+1、简单。
+
+2、只需要复制 `/root/.local`。
+
+3、适合小项目、脚本类项目、没有复杂系统依赖的项目。
+
+缺点：
+
+1、它仍然和镜像自带的系统 Python 环境共享解释器和全局环境。
+
+2、隔离性不如 virtualenv。
+
+3、如果后续切到非 root 用户，需要注意 home 目录和 `.local` 路径变化。
+
+如果 runtime 阶段使用非 root 用户，更建议不要依赖 `/root/.local`，可以显式指定用户目录：
+
+```dockerfile
+FROM python:3.12-slim AS compile-image
+
+RUN apt-get update
+RUN apt-get install -y --no-install-recommends build-essential gcc
+
+ENV PYTHONUSERBASE=/opt/python-user
+ENV PATH=/opt/python-user/bin:$PATH
+
+COPY requirements.txt .
+RUN pip install --user -r requirements.txt
+
+COPY . .
+RUN pip install --user .
+
+FROM python:3.12-slim AS runtime-image
+
+ENV PYTHONUSERBASE=/opt/python-user
+ENV PATH=/opt/python-user/bin:$PATH
+
+COPY --from=compile-image /opt/python-user /opt/python-user
+
+CMD ["myapp"]
+```
+
+#### 方案二：virtualenv
+
+virtualenv 的思路是把 Python 依赖安装到一个独立目录，例如：
+
+```text
+/opt/venv
+```
+
+runtime 阶段复制整个 `/opt/venv`，再把它的 `bin` 放进 `PATH`。
+
+示例：
+
+```dockerfile
+FROM python:3.12-slim AS compile-image
+
+RUN apt-get update
+RUN apt-get install -y --no-install-recommends build-essential gcc
+
+RUN python -m venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH
+
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY setup.py .
+COPY myapp/ myapp/
+RUN pip install .
+
+FROM python:3.12-slim AS runtime-image
+
+COPY --from=compile-image /opt/venv /opt/venv
+
+ENV PATH=/opt/venv/bin:$PATH
+
+CMD ["myapp"]
+```
+
+这个方案的优点：
+
+1、隔离更清楚。
+
+2、复制目录明确：`/opt/venv`。
+
+3、更接近本地开发环境的 Python 使用习惯。
+
+4、适合生产项目。
+
+缺点：
+
+1、比 `pip install --user` 多一步创建 venv。
+
+2、builder 和 runtime 的 Python 版本、基础镜像要保持一致，否则 venv 里的解释器路径和二进制扩展可能不兼容。
+
+推荐规则：
+
+```text
+小项目、简单脚本：pip install --user 可以接受
+生产项目、依赖复杂：优先 virtualenv
+```
+
+#### 重要补充：runtime 仍然可能需要系统动态库
+
+多阶段构建能去掉编译器，但不能去掉运行时真正需要的动态库。
+
+例如这些 Python 包经常涉及系统库：
+
+| Python 包 | 构建时可能需要 | 运行时可能需要 |
+| --- | --- | --- |
+| `psycopg2` | `gcc`、`libpq-dev` | `libpq5` |
+| `mysqlclient` | `gcc`、`default-libmysqlclient-dev` | MySQL/MariaDB client runtime lib |
+| `lxml` | `gcc`、`libxml2-dev`、`libxslt1-dev` | `libxml2`、`libxslt1.1` |
+| `Pillow` | `gcc`、图片格式 dev 包 | jpeg/png/zlib 等运行库 |
+| `cryptography` | Rust/C 构建环境 | OpenSSL 相关运行库，取决于 wheel/构建方式 |
+
+如果 builder 里编译出来的 `.so` 依赖某个系统库，而 runtime 镜像没装这个库，运行时会报类似：
+
+```text
+ImportError: libxxx.so: cannot open shared object file
+```
+
+所以 runtime 阶段不需要 `gcc`，但可能仍然需要安装运行库：
+
+```dockerfile
+FROM python:3.12-slim AS runtime-image
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=compile-image /opt/venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH
+
+CMD ["myapp"]
+```
+
+#### 更完整的生产写法：venv + 缓存 + 非 root
+
+下面是更接近真实项目的写法：
+
+```dockerfile
+FROM python:3.12-slim AS builder
+
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m venv $VIRTUAL_ENV
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements.txt
+
+COPY . .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install .
+
+FROM python:3.12-slim AS runtime
+
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN useradd --create-home --uid 10001 appuser
+
+COPY --from=builder /opt/venv /opt/venv
+COPY --chown=appuser:appuser . /app
+
+USER appuser
+
+CMD ["myapp"]
+```
+
+这里有几个点：
+
+1、先复制 `requirements.txt`，再 `pip install`，这样业务代码变化时依赖层可以复用缓存。
+
+2、`--mount=type=cache,target=/root/.cache/pip` 是 BuildKit 的缓存能力，可以加速重复构建。
+
+3、runtime 阶段不安装 `gcc` 和 `build-essential`。
+
+4、使用非 root 用户运行应用。
+
+5、`PYTHONUNBUFFERED=1` 可以让日志更及时输出到 Docker logs。
+
+如果 Docker 没启用 BuildKit，`RUN --mount=type=cache` 可能不可用，可以先用普通写法：
+
+```dockerfile
+RUN pip install --no-cache-dir -r requirements.txt
+```
+
+#### wheels 方案
+
+文章还提到另一种方案：先在 builder 阶段构建 wheel，再到 runtime 阶段安装 wheel。
+
+思路：
+
+```dockerfile
+FROM python:3.12-slim AS builder
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip wheel --wheel-dir /wheels -r requirements.txt
+
+COPY . .
+RUN pip wheel --wheel-dir /wheels .
+
+FROM python:3.12-slim AS runtime
+
+COPY --from=builder /wheels /wheels
+RUN pip install --no-cache-dir /wheels/*
+
+CMD ["myapp"]
+```
+
+这个方案的特点：
+
+1、runtime 阶段仍然会执行 `pip install`，但安装的是已经构建好的 wheel。
+
+2、适合需要把 wheel 产物保存、上传、复用的场景。
+
+3、对于普通项目，不一定比复制 `/opt/venv` 更简单。
+
+文章观点是：wheels 可行，但未必比 `--user` 或 venv 方案更有明显优势。
+
+#### pex 和 platter
+
+文章还提到 `pex` 和 `platter`：
+
+| 工具 | 作用 | 理解 |
+| --- | --- | --- |
+| `pex` | 把 Python 应用打成单文件可执行包 | 类似把依赖和入口点封装到一个文件 |
+| `platter` | 把应用和依赖打包成可解压的环境 | 解开后接近一个 virtualenv |
+
+这些工具适合更复杂的发布系统，但普通 Docker 项目里不一定需要。很多时候，`venv + multi-stage` 已经足够清楚。
+
+#### 构建缓存问题
+
+多阶段构建虽然能减小镜像，但如果 Dockerfile 写法不好，会导致每次都重新安装依赖。
+
+不推荐：
+
+```dockerfile
+COPY . .
+RUN pip install -r requirements.txt
+```
+
+只要任意业务文件变化，`COPY . .` 这一层就会失效，后面的 `pip install` 也会重新执行。
+
+推荐：
+
+```dockerfile
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY . .
+RUN pip install .
+```
+
+这样只有 `requirements.txt` 变化时，依赖安装层才会失效。
+
+#### 总结
+
+这篇文章的核心不是“Python 一定要多阶段构建”，而是：
+
+1、如果 Python 依赖需要编译，builder 阶段应该包含编译器。
+
+2、runtime 阶段应该尽量只保留运行时需要的文件。
+
+3、Python 依赖安装位置分散，所以要人为把它们集中到一个目录。
+
+4、集中目录最常见的两种方法是 `pip install --user` 和 `virtualenv`。
+
+5、生产项目更推荐 `virtualenv`，复制 `/opt/venv` 到 runtime 阶段。
+
+6、多阶段构建去不掉真正需要的运行时动态库，只能去掉编译工具链。
+
+
+
 ### 构建自己的CentOS
 
 DockerHub 中 99%的镜像都是从基础镜像 scratch过来的
