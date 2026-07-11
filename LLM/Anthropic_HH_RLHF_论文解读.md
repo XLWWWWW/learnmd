@@ -244,6 +244,58 @@ Online dataset 是论文中另一个重要数据来源。这里的 online 不是
 
 Online dataset 的作用是让偏好模型持续看到当前 RLHF 模型真实会生成的回答，从而减少训练数据和当前模型行为之间的分布偏移。
 
+### 5.4 三个数据集在训练流程中的位置
+
+这三个数据集最好不要理解成三个完全不同的任务，而应理解成同一种偏好比较数据在不同训练阶段的三批来源。
+
+统一的数据形式都是：
+
+```text
+对话上下文
+候选回答 A
+候选回答 B
+人类偏好标签
+```
+
+区别在于候选回答来自哪个阶段的模型：
+
+| 数据集 | 候选回答主要来自 | 主要作用 |
+| --- | --- | --- |
+| Core base dataset | context-distilled LM | 冷启动训练第一版 Preference Model |
+| RS dataset | rejection sampling 模型 | 让人类比较更高质量、更难区分的回答，用于训练更强的 Preference Model |
+| Online dataset | 迭代中的 RLHF 模型 | 让 Preference Model 跟上当前 policy 的输出分布，减少分布偏移 |
+
+所以论文中的使用关系可以理解为：
+
+```text
+context-distilled LM
+    ↓
+收集 core base dataset
+    ↓
+训练初版 Preference Model
+    ↓
+用 Preference Model 做 rejection sampling
+    ↓
+收集 RS dataset
+    ↓
+训练更强的 Preference Model
+    ↓
+用 Preference Model 作为 reward 做 PPO / RLHF
+    ↓
+部署并迭代 RLHF 模型
+    ↓
+收集 online dataset
+    ↓
+继续训练更贴近当前模型分布的 Preference Model 和 RLHF policy
+```
+
+论文里也可以把数据使用方式粗略分成两层：
+
+- **static data**：主要指 base dataset + RS dataset，用来训练静态版本的 Preference Model 和 RLHF 模型。
+- **online data**：在 RLHF 模型迭代过程中继续收集，用来更新 online Preference Model 和后续 policy。
+
+核心动机是：模型越训练越强，回答分布就越不像最早的 context-distilled LM。如果 Preference Model 只看早期模型的回答，它可能很擅长分辨明显好坏，却不擅长判断两个强模型回答之间的细微差别。因此 Anthropic 用 base → RS → online 这条链路，让偏好数据逐步跟上模型能力。
+
 ## 6. 标注任务怎么理解
 
 Anthropic 的标注主要不是“写标准答案”，而是“比较两个回答”。
@@ -595,6 +647,6 @@ Anthropic HH-RLHF 论文的核心可以概括为：
 
 - Anthropic, [Training a Helpful and Harmless Assistant with Reinforcement Learning from Human Feedback](https://arxiv.org/abs/2204.05862), 2022.
 - Anthropic, [HH-RLHF paper page](https://www.anthropic.com/research/training-a-helpful-and-harmless-assistant-with-reinforcement-learning-from-human-feedback), 2022.
+- Anthropic, [HH-RLHF dataset](https://huggingface.co/datasets/Anthropic/hh-rlhf), 2022.
 - OpenAI, [Training language models to follow instructions with human feedback](https://arxiv.org/abs/2203.02155), 2022.
 - OpenAI, [Aligning language models to follow instructions](https://openai.com/index/instruction-following/), 2022.
-
