@@ -1,5 +1,7 @@
 # OCI Image Layout 与容器镜像结构
 
+> 专题导航：[容器镜像文件系统专题索引](./容器镜像文件系统专题索引.md)
+
 这篇 challenge 想教的核心不是“怎么导出镜像”，而是让你理解：**一个容器镜像在 registry 或 OCI layout 里，本质上是一组通过 digest 相互引用的 JSON 文档和 layer blob**。
 
 Docker 平时把这些结构隐藏起来了。你看到的是：

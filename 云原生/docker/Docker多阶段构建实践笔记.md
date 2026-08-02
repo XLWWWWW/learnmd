@@ -1,5 +1,7 @@
 # Docker 多阶段构建实践笔记
 
+> 专题导航：[容器镜像文件系统专题索引](./容器镜像文件系统专题索引.md)
+
 本文整理自 Ivan Velichko 的《How to Build Smaller Container Images: Docker Multi-Stage Builds》，并补充 Dockerfile 优化、不同技术栈模板、BuildKit 缓存、安全和日常排查经验。
 
 这篇文章的核心观点很直接：
