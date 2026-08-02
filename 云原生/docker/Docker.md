@@ -167,7 +167,7 @@ Docker 利用容器（Container）独立运行的一个或一组应用，**应�
 > 
 > ```
 >
-> <img src=".\asset\images\image-20240404221735768.png" alt="image-20240404221735768" style="zoom:67%;" />
+> <img src="../../asset/images/image-20240404221735768.png" alt="image-20240404221735768" style="zoom:67%;" />
 >
 > ```shell
 > # 8、查看hello-world镜像
@@ -196,7 +196,7 @@ Docker 利用容器（Container）独立运行的一个或一组应用，**应�
 
 ### Hello-world 流程
 
-<img src=".\asset\images\image-20240404222602664.png" alt="image-20240404222602664" style="zoom:67%;" />
+<img src="../../asset/images/image-20240404222602664.png" alt="image-20240404222602664" style="zoom:67%;" />
 
 ### 底层原理
 
@@ -206,7 +206,7 @@ docker是一个 Client-Server结构的系统，Docker的守护进行一直在后
 
 DockerServer 接收到Docker-Client的指令 就会执行这个命令
 
-![image-20240404223059583](.\asset\images\image-20240404223059583.png)
+![image-20240404223059583](../../asset/images/image-20240404223059583.png)
 
 **为什么比虚拟机快**
 
@@ -869,7 +869,7 @@ docker stats
 
 使用kibana连接elasticsearch
 
-![image-20240405141907105](.\asset\images\image-20240405141907105.png)
+![image-20240405141907105](../../asset/images/image-20240405141907105.png)
 
 
 
@@ -939,7 +939,7 @@ rootfs (root file system) ，在bootfs之上。包含的就是典型 Linux 系�
 
 ### 分层理解
 
-![image-20240405151942415](.\asset\images\image-20240405151942415.png)
+![image-20240405151942415](../../asset/images/image-20240405151942415.png)
 
 层级的结构 方便多个镜像复用共同的基层
 
@@ -983,7 +983,7 @@ docs  examples  host-manager  manager  ROOT
 [root@localhost ~]# docker commit -a="xlwwwww" -m="add webapps" 6d8c12031532 tomcat02:1.0
 ```
 
-![image-20240405154911566](.\asset\images\image-20240405154911566.png)
+![image-20240405154911566](../../asset/images/image-20240405154911566.png)
 
 
 
@@ -999,7 +999,7 @@ Docker 将应用和环境打包成一个镜像
 
 在Docker容器中产生的数据能够同步到本地  =======》将容器内的目录 挂载到宿主机上
 
-![image-20240405163005917](.\asset\images\image-20240405163005917.png)
+![image-20240405163005917](../../asset/images/image-20240405163005917.png)
 
 总结，使用挂载数据卷实现 容器的持久化和同步操作  容器间也是可以进行数据共享的。
 
@@ -1023,13 +1023,13 @@ CONTAINER ID   IMAGE                 COMMAND        CREATED         STATUS      
 [root@localhost ceshi]# docker inspect 41b755fe0acb
 ```
 
-![image-20240405163901490](.\asset\images\image-20240405163901490.png)
+![image-20240405163901490](../../asset/images/image-20240405163901490.png)
 
 
 
 **两个映射的文件夹的数据是会相互同步的**
 
-![image-20240405165221145](.\asset\images\image-20240405165221145.png)
+![image-20240405165221145](../../asset/images/image-20240405165221145.png)
 
 运行的容器删除后，无论强制与否，挂载的本地数据卷中的内容依旧没有丢失
 
@@ -1065,7 +1065,7 @@ mysql -h ip -P port -u root -p123456
 
 容器彻底删除后，同步到宿主机的文件依旧没有丢失
 
-![image-20240405172113846](.\asset\images\image-20240405172113846.png)
+![image-20240405172113846](../../asset/images/image-20240405172113846.png)
 
 
 
@@ -1133,11 +1133,11 @@ local     juming-nginx
 ] 
 ```
 
-<img src=".\asset\images\image-20240405174211284.png" alt="image-20240405174211284" style="zoom:67%;" />
+<img src="../../asset/images/image-20240405174211284.png" alt="image-20240405174211284" style="zoom:67%;" />
 
 > 进到这个地址可以看到 之前的匿名映射的文件夹也在这里 ，这就是映射的默认文件夹
 >
-> ![image-20240405175111936](.\asset\images\image-20240405175111936.png)
+> ![image-20240405175111936](../../asset/images/image-20240405175111936.png)
 
 
 
@@ -1201,7 +1201,7 @@ CMD /bin/bash
 docker build -f dockerfile1 -t kuangshen-centos:1.0 .
 ```
 
-<img src=".\asset\images\image-20240405181656976.png" alt="image-20240405181656976" style="zoom:67%;" />
+<img src="../../asset/images/image-20240405181656976.png" alt="image-20240405181656976" style="zoom:67%;" />
 
 
 
@@ -1210,7 +1210,7 @@ docker build -f dockerfile1 -t kuangshen-centos:1.0 .
 docker run -it f8b442ef8a08 /bin/bash
 ```
 
-<img src=".\asset\images\image-20240405182116158.png" alt="image-20240405182116158" style="zoom: 80%;" />
+<img src="../../asset/images/image-20240405182116158.png" alt="image-20240405182116158" style="zoom: 80%;" />
 
 ```shell
 # 这个卷和外部的地址一定是关联的 查看外部挂载路径
@@ -1220,7 +1220,7 @@ CONTAINER ID   IMAGE          COMMAND       CREATED         STATUS         PORTS
 [root@localhost ~]# docker inspect 1f87bcc5e9ad
 ```
 
-<img src=".\asset\images\image-20240405182600031.png" alt="image-20240405182600031" style="zoom:67%;" />
+<img src="../../asset/images/image-20240405182600031.png" alt="image-20240405182600031" style="zoom:67%;" />
 
 
 
@@ -1228,7 +1228,7 @@ CONTAINER ID   IMAGE          COMMAND       CREATED         STATUS         PORTS
 
 多个容器间同步数据
 
-![image-20240405192935769](.\asset\images\image-20240405192935769.png)
+![image-20240405192935769](../../asset/images/image-20240405192935769.png)
 
 
 
@@ -1242,11 +1242,11 @@ CONTAINER ID   IMAGE          COMMAND       CREATED         STATUS         PORTS
 #在docker01中创建的文件同步到了docker02中 两个容器间的数据能够同步 docker01称为数据卷容器
 ```
 
-<img src=".\asset\images\image-20240405211014628.png" alt="image-20240405211014628" style="zoom:67%;" />
+<img src="../../asset/images/image-20240405211014628.png" alt="image-20240405211014628" style="zoom:67%;" />
 
 > 同理，还能在docker01的数据卷上继续挂载 之间的数据是互通的
 >
-> ![image-20240405211721969](.\asset\images\image-20240405211721969.png)
+> ![image-20240405211721969](../../asset/images/image-20240405211721969.png)
 >
 > 此时，docker02 docker03都继承于docker01
 >
@@ -1254,7 +1254,7 @@ CONTAINER ID   IMAGE          COMMAND       CREATED         STATUS         PORTS
 >
 > docker01，docker02和docker03中的数据还在，并且docker02和docker03还能够继续互通数据
 >
-> ![image-20240405213330836](.\asset\images\image-20240405213330836.png)
+> ![image-20240405213330836](../../asset/images/image-20240405213330836.png)
 >
 > 各数据卷之间的是拷贝的概念，一个容器删除后，其余的数据库应该是不受影响的
 
@@ -2068,7 +2068,7 @@ CMD /bin/bash
 # 并且还安装了 vim 和 net-tools 能够查询本机网络信息
 ```
 
-![image-20240405232557805](.\asset\images\image-20240405232557805.png)
+![image-20240405232557805](../../asset/images/image-20240405232557805.png)
 
 4、docker history 查看镜像变更历史
 
@@ -2144,7 +2144,7 @@ a69caa4c5527   About an hour ago   CMD ["/bin/sh" "-c" "/bin/bash"]             
 > [root@localhost dockerfile]# docker run cmdtest:1.0 ls -a -l
 > ```
 >
-> ![image-20240405234238637](.\asset\images\image-20240405234238637.png)
+> ![image-20240405234238637](../../asset/images/image-20240405234238637.png)
 >
 > 
 >
@@ -2207,7 +2207,7 @@ a69caa4c5527   About an hour ago   CMD ["/bin/sh" "-c" "/bin/bash"]             
 > drwxr-xr-x.  20 root root 262 Sep 15  2021 var
 > ```
 >
-> <img src=".\asset\images\image-20240405235218144.png" alt="image-20240405235218144" style="zoom:67%;" />
+> <img src="../../asset/images/image-20240405235218144.png" alt="image-20240405235218144" style="zoom:67%;" />
 
 
 
@@ -2350,7 +2350,7 @@ CMD /usr/local/apache-tomcat-10.1.20/bin/startup.sh && tail -F /usr/local/apache
 
 > ip addr
 >
-> ![image-20240406104356957](.\asset\images\image-20240406104356957.png)
+> ![image-20240406104356957](../../asset/images/image-20240406104356957.png)
 >
 > 运行镜像后后 可以在查看镜像内的IP地址
 >
@@ -2365,7 +2365,7 @@ CMD /usr/local/apache-tomcat-10.1.20/bin/startup.sh && tail -F /usr/local/apache
 > [root@localhost ~]# docker exec -it tomcat01 ip addr
 > ```
 >
-> ![image-20240406105606072](.\asset\images\image-20240406105606072.png)
+> ![image-20240406105606072](../../asset/images/image-20240406105606072.png)
 >
 > 
 >
@@ -2373,7 +2373,7 @@ CMD /usr/local/apache-tomcat-10.1.20/bin/startup.sh && tail -F /usr/local/apache
 >
 > - 宿主机能够ping通镜像ip
 >
-> ![image-20240406105747698](.\asset\images\image-20240406105747698.png)
+> ![image-20240406105747698](../../asset/images/image-20240406105747698.png)
 >
 > 
 >
@@ -2383,11 +2383,11 @@ CMD /usr/local/apache-tomcat-10.1.20/bin/startup.sh && tail -F /usr/local/apache
 >
 > 每启动一个容器，宿主机都会产生一个新的veth开头的ip  
 >
-> ![image-20240406110637429](.\asset\images\image-20240406110637429.png)
+> ![image-20240406110637429](../../asset/images/image-20240406110637429.png)
 
 > 这是容器内的ip addr
 >
-> ![image-20240406111338026](.\asset\images\image-20240406111338026.png)
+> ![image-20240406111338026](../../asset/images/image-20240406111338026.png)
 >
 > 运行容器产生的网卡,都是成对出现的   一端连着协议 一端彼此相连
 >
@@ -2401,7 +2401,7 @@ CMD /usr/local/apache-tomcat-10.1.20/bin/startup.sh && tail -F /usr/local/apache
 > root@1b9b1fd5b52c:/usr/local/tomcat# ping 172.17.0.3				
 > ```
 >
-> <img src=".\asset\images\image-20240406113420455.png" alt="image-20240406113420455" style="zoom:67%;" />
+> <img src="../../asset/images/image-20240406113420455.png" alt="image-20240406113420455" style="zoom:67%;" />
 >
 > tomcat01和tomcat02共同连接docker0 
 >
@@ -2417,7 +2417,7 @@ Docker中所有的网络接口都是虚拟的.
 
 只要运行中的容器删除,对应的网桥就没有了
 
-<img src=".\asset\images\image-20240406114007548.png" alt="image-20240406114007548" style="zoom:67%;" />
+<img src="../../asset/images/image-20240406114007548.png" alt="image-20240406114007548" style="zoom:67%;" />
 
 ### --link
 
@@ -2443,7 +2443,7 @@ PING tomcat02 (172.17.0.3): 56 data bytes
 >
 > **其实 tomcat3的--link 就是在tomcat3本地host中增加了tomcat02的配置**
 >
-> ![image-20240406122008930](.\asset\images\image-20240406122008930.png)
+> ![image-20240406122008930](../../asset/images/image-20240406122008930.png)
 >
 > 
 >
@@ -2455,7 +2455,7 @@ PING tomcat02 (172.17.0.3): 56 data bytes
 
 产看所有的docker网络
 
-![image-20240406122333638](.\asset\images\image-20240406122333638.png)
+![image-20240406122333638](../../asset/images/image-20240406122333638.png)
 
 > 网络模式:
 >
@@ -2545,11 +2545,11 @@ cdb9b487a3d1e9fc00c7e4e10e2740539177ada6974dd4f771c7487bd2189d09
 [root@localhost ~]# docker network inspect mynet
 ```
 
-> ![image-20240406152710416](.\asset\images\image-20240406152710416.png)
+> ![image-20240406152710416](../../asset/images/image-20240406152710416.png)
 
-![image-20240406124429728](.\asset\images\image-20240406124429728.png)
+![image-20240406124429728](../../asset/images/image-20240406124429728.png)
 
-![image-20240406152926653](.\asset\images\image-20240406152926653.png) **这里为啥 tomcat01能pingtomcat02 但是tomcat02不能pingtomcat01**   
+![image-20240406152926653](../../asset/images/image-20240406152926653.png) **这里为啥 tomcat01能pingtomcat02 但是tomcat02不能pingtomcat01**   
 
 自定义的网络 docker都帮我们维护好了对应的关系,推荐我们平时这样使用网络
 
@@ -2559,7 +2559,7 @@ cdb9b487a3d1e9fc00c7e4e10e2740539177ada6974dd4f771c7487bd2189d09
 
 如何打通使用不同网络运行的容器
 
-<img src=".\asset\images\image-20240406161637733.png" alt="image-20240406161637733" style="zoom:67%;" />
+<img src="../../asset/images/image-20240406161637733.png" alt="image-20240406161637733" style="zoom:67%;" />
 
 > docker network connect
 >
@@ -2582,11 +2582,11 @@ cdb9b487a3d1e9fc00c7e4e10e2740539177ada6974dd4f771c7487bd2189d09
 # 这就是 一个容器 两个IP
 ```
 
-<img src=".\asset\images\image-20240406161138676.png" alt="image-20240406161138676" style="zoom:67%;" />
+<img src="../../asset/images/image-20240406161138676.png" alt="image-20240406161138676" style="zoom:67%;" />
 
 这里 tomat01已经联通了 但是由于tomcat2没有设置，因此还没有联通
 
-·![image-20240406161418790](.\asset\images\image-20240406161418790.png)
+·![image-20240406161418790](../../asset/images/image-20240406161418790.png)
 
 因此，可以通过 docker network connect 联通后 ，跨网络操作别的容器。
 
@@ -2594,7 +2594,7 @@ cdb9b487a3d1e9fc00c7e4e10e2740539177ada6974dd4f771c7487bd2189d09
 
 ### 部署Redis集群
 
-![image-20240406161844523](.\asset\images\image-20240406161844523.png)
+![image-20240406161844523](../../asset/images/image-20240406161844523.png)
 
 ```shell
 #创建网络
@@ -2644,7 +2644,7 @@ docker run -p 6376:6379 -p 16376:16379 --name redis-6 -v /mydata/redis/node-6/da
 
 ```
 
-![image-20240406170616799](.\asset\images\image-20240406170616799.png)
+![image-20240406170616799](../../asset/images/image-20240406170616799.png)
 
 
 
@@ -2656,7 +2656,7 @@ docker run -p 6376:6379 -p 16376:16379 --name redis-6 -v /mydata/redis/node-6/da
 
 - 首先阿里云购买服务器 **1主三从**
 
-![image-20240406215647792](.\asset\images\image-20240406215647792.png)
+![image-20240406215647792](../../asset/images/image-20240406215647792.png)
 
 > CentOS 7.8  自定义密码   默认安全组
 
@@ -2677,7 +2677,7 @@ docker run -p 6376:6379 -p 16376:16379 --name redis-6 -v /mydata/redis/node-6/da
   sudo systemctl restart docker
   ```
 
-  ![image-20240406222321891](.\asset\images\image-20240406222321891.png
+  ![image-20240406222321891](../../asset/images/image-20240406222321891.png)
 
 ### 工作模式
 
@@ -2685,7 +2685,7 @@ docker run -p 6376:6379 -p 16376:16379 --name redis-6 -v /mydata/redis/node-6/da
 
 Raft    一致性算法
 
-![image-20240406222518495](.\asset\images\image-20240406222518495.png)
+![image-20240406222518495](../../asset/images/image-20240406222518495.png)
 
 
 
@@ -2724,7 +2724,7 @@ Raft    一致性算法
   [root@iZhp3f9on9yuqop7e7zcn8Z ~]# docker swarm init --advertise-addr 172.20.242.210
   ```
 
-  ![image-20240406223621189](.\asset\images\image-20240406223621189.png)
+  ![image-20240406223621189](../../asset/images/image-20240406223621189.png)
 
   上面的提示，加入一个工作节点    docker swarm join --      
 
@@ -2746,7 +2746,7 @@ Raft    一致性算法
 
   这里在manager节点的主机能够 通过 `docker node ls` 查看连接的节点信息
 
-  ![image-20240406230243823](.\asset\images\image-20240406230243823.png)
+  ![image-20240406230243823](../../asset/images/image-20240406230243823.png)
 
   同样 能够在相应的主机 使用 `docker swarm leave`命令离开 swarm
 
@@ -2764,7 +2764,7 @@ Raft    一致性算法
     This node joined a swarm as a manager.
     ```
 
-    ![image-20240406230915259](.\asset\images\image-20240406230915259.png)
+    ![image-20240406230915259](../../asset/images/image-20240406230915259.png)
 
   
 

@@ -57,7 +57,7 @@ spec:
 
 > 
 >
-> <img src=".\asset\images\image-20250420120956764.png" alt="image-20250420120956764" style="zoom:67%;" />
+> <img src="../../asset/images/image-20250420120956764.png" alt="image-20250420120956764" style="zoom:67%;" />
 >
 > - 归属情况测试
 >
@@ -246,11 +246,11 @@ spec:
 
 Deployment 为Pod和 ReplicaSet 提供了一个声明式定义(declarative)方法，用来替代以前的ReplicationController 来方便的管理应用。
 
-> <img src=".\asset\images\image-20250420184238676.png" alt="image-20250420184238676" style="zoom:67%;" />
+> <img src="../../asset/images/image-20250420184238676.png" alt="image-20250420184238676" style="zoom:67%;" />
 >
-> <img src=".\asset\images\image-20250420184355087.png" alt="image-20250420184355087" style="zoom:67%;" />
+> <img src="../../asset/images/image-20250420184355087.png" alt="image-20250420184355087" style="zoom:67%;" />
 >
-> <img src=".\asset\images\image-20250420184714259.png" alt="image-20250420184714259" style="zoom:67%;" />
+> <img src="../../asset/images/image-20250420184714259.png" alt="image-20250420184714259" style="zoom:67%;" />
 >
 > - 总的来说 replace 命令是完全覆盖 **对于缺省值也会直接按照新的覆盖**
 >
@@ -312,13 +312,13 @@ spec:
 >
 > deployment 实际上的功能 是通过掌控 ReplicaSet来完成的
 >
-> <img src=".\asset\images\image-20250420190959242.png" alt="image-20250420190959242" style="zoom:67%;" />
+> <img src="../../asset/images/image-20250420190959242.png" alt="image-20250420190959242" style="zoom:67%;" />
 >
 > **实际的优势在于，通过声明式的部署原理，能够在变更原有 rs的基础上 滚动更新，不会立即终止掉原有的服务**，保证用户实际体验
 >
 > 同时，如若现有的版本出现问题，原本的 rs 配置文件还会保存在 etcd中，方便 **版本回滚**
 >
-> <img src=".\asset\images\image-20250420191607347.png" alt="image-20250420191607347" style="zoom:67%;" />
+> <img src="../../asset/images/image-20250420191607347.png" alt="image-20250420191607347" style="zoom:67%;" />
 
 ```yaml
 apiVersion: apps/v1
@@ -367,9 +367,9 @@ spec:
 >   >
 >   > 
 >   >
->   > <img src=".\asset\images\image-20250420200402483.png" alt="image-20250420200402483" style="zoom:67%;" />
+>   > <img src="../../asset/images/image-20250420200402483.png" alt="image-20250420200402483" style="zoom:67%;" />
 >   >
->   > ![image-20250420200657413](.\asset\images\image-20250420200657413.png)
+>   > ![image-20250420200657413](../../asset/images/image-20250420200657413.png)
 >   >
 >   > - **金丝雀部署**
 >   >
@@ -400,7 +400,7 @@ spec:
 >   >
 >   > - kubectl rollout history deployment/nginx-deployment
 >   >
->   >   查看变更历史![image-20250420203550804](.\asset\images\image-20250420203550804.png)在执行变更命令时 加 --record 会记录命令
+>   >   查看变更历史![image-20250420203550804](../../asset/images/image-20250420203550804.png)在执行变更命令时 加 --record 会记录命令
 >   >
 >   >   但是前一条加后一条不加的情况下，后一条的记录会复制上一条的record
 >   >
@@ -649,7 +649,7 @@ spec:
 > | **`.spec.concurrencyPolicy`**       | **并发策略：是否允许不同批次的job是否能够重叠运行**<br /> • `Allow`（默认）：允许并发执行 <br />• `Forbid`：禁止并发，跳过新任务 <br />• `Replace`：终止当前任务并启动新任务 |
 > | **`.spec.suspend`**                 | 设置为 `true` 暂停后续调度（不影响已运行的 Job)<br />        |
 >
-> > <img src=".\asset\images\image-20250420223902268.png" alt="image-20250420223902268" style="zoom:67%;" />
+> > <img src="../../asset/images/image-20250420223902268.png" alt="image-20250420223902268" style="zoom:67%;" />
 >
 > ------
 >
@@ -769,13 +769,13 @@ Kubernetes `Service` 定义了这样一种抽象：一个 `Pod` 的逻辑分组�
 >
 > - 之前曾经提到过，pod在运行之后，如果通过就绪探针验证，那么就会被service抓取到负载均衡集群
 >
-> <img src=".\asset\images\image-20250426170420049.png" alt="image-20250426170420049" style="zoom:67%;" />
+> <img src="../../asset/images/image-20250426170420049.png" alt="image-20250426170420049" style="zoom:67%;" />
 >
 > - 这里通过 deployment 管理稳定的pod
 >
 > - 再通过 service 提供负载均衡的访问
 >
->   <img src=".\asset\images\image-20250426170934696.png" alt="image-20250426170934696" style="zoom:67%;" />
+>   <img src="../../asset/images/image-20250426170934696.png" alt="image-20250426170934696" style="zoom:67%;" />
 
 在 Kubernetes 集群中，每个 Node 运行一个 `kube-proxy` 进程。 `kube-proxy` 负责为 `Service` 实现了一种 VIP（虚拟 IP）的形式
 
@@ -796,25 +796,25 @@ Kubernetes `Service` 定义了这样一种抽象：一个 `Pod` 的逻辑分组�
 
 > - clusterIP
 >
-> <img src=".\asset\images\image-20250426174418335.png" alt="image-20250426174418335" style="zoom: 50%;" />
+> <img src="../../asset/images/image-20250426174418335.png" alt="image-20250426174418335" style="zoom: 50%;" />
 >
 > - nodeport
 >
 >   clusterIP提供的是内部访问IP的能力，nodeport 提供了 外部访问的能力
 >
->   <img src=".\asset\images\image-20250426174712764.png" alt="image-20250426174712764" style="zoom:50%;" />
+>   <img src="../../asset/images/image-20250426174712764.png" alt="image-20250426174712764" style="zoom:50%;" />
 >
 > 
 >
 > - LoadBalancer
 >
->   ![image-20250426175519373](.\asset\images\image-20250426175519373.png)
+>   ![image-20250426175519373](../../asset/images/image-20250426175519373.png)
 >
 > - ExternalName 
 >
 >   dns别名机制
 >
->   <img src=".\asset\images\image-20250426175917798.png" alt="image-20250426175917798" style="zoom:50%;" />
+>   <img src="../../asset/images/image-20250426175917798.png" alt="image-20250426175917798" style="zoom:50%;" />
 
 
 
@@ -1093,7 +1093,7 @@ spec:
 
 如果按照前面的设置nodeport，每个集群便拥有了外部访问的能力，同时，为了保证外部访问的高可用能力，也能在外部架设一层负载均衡，来保证外部用户对某个地址(这里能够指定外网地址)的稳定访问
 
-<img src=".\asset\images\image-20250426195233205.png" alt="image-20250426195233205" style="zoom: 50%;" />
+<img src="../../asset/images/image-20250426195233205.png" alt="image-20250426195233205" style="zoom: 50%;" />
 
 
 
@@ -1127,7 +1127,7 @@ spec:
 3. **跨命名空间统一访问**
    - 例如，不同命名空间的 Pod 均可通过 `my-db-service.default.svc.cluster.local` 访问外部数据库，而无需关心实际地址。
 
-![image-20250426200637314](.\asset\images\image-20250426200637314.png)
+![image-20250426200637314](../../asset/images/image-20250426200637314.png)
 
 ```yaml
 apiVersion: v1
@@ -1145,7 +1145,7 @@ spec:
 
 ### Endpoints
 
-<img src=".\asset\images\image-20250426202655056.png" alt="image-20250426202655056"  />
+<img src="../../asset/images/image-20250426202655056.png" alt="image-20250426202655056"  />
 
 **1. Service 的作用**
 
@@ -1178,13 +1178,13 @@ spec:
 
   实际上由内部的endpoint通过拉取符合条件的pod信息，并且将其访问地址进行维护来提供的
 
-  ![image-20250426203018835](.\asset\images\image-20250426203018835.png)
+  ![image-20250426203018835](../../asset/images/image-20250426203018835.png)
 
   > 创建service后，会自动创建对应的endpoint负责维护符合条件的pod的访问信息
   >
   > endpoint也是一种资源
   >
-  > ![image-20250426204216105](.\asset\images\image-20250426204216105.png)
+  > ![image-20250426204216105](../../asset/images/image-20250426204216105.png)
 
 - **没有配置selector  ---> 手动关联体系**
 
@@ -1192,7 +1192,7 @@ spec:
 
   管理员手动创建一个与之对应的 endpoint 来维护这个关系
 
-  ![image-20250426203208920](.\asset\images\image-20250426203208920.png)
+  ![image-20250426203208920](../../asset/images/image-20250426203208920.png)
 
   > 1、创建不包含 selector 的 service
   >
@@ -1232,7 +1232,7 @@ spec:
   >
   > 4、通过service访问
   >
-  > ![image-20250426205909312](.\asset\images\image-20250426205909312.png)
+  > ![image-20250426205909312](../../asset/images/image-20250426205909312.png)
   >
   > 这里经过测试 无论 endpoints 是否为手动创建，在清理掉其对应的service时会被一并删除
 
@@ -1272,7 +1272,7 @@ spec:
 >       periodSeconds: 3
 > ```
 >
-> ![image-20250426211322879](.\asset\images\image-20250426211322879.png)
+> ![image-20250426211322879](../../asset/images/image-20250426211322879.png)
 >
 > 2、创建service
 >
@@ -1296,7 +1296,7 @@ spec:
 >
 > > 未就绪pod无法被抓取
 > >
-> > <img src=".\asset\images\image-20250426211516049.png" alt="image-20250426211516049" style="zoom:67%;" />
+> > <img src="../../asset/images/image-20250426211516049.png" alt="image-20250426211516049" style="zoom:67%;" />
 >
 > 3、开启 publishNotReadyAddresses
 >
@@ -1308,7 +1308,7 @@ spec:
 >
 > > endpoints能够捕捉到未就绪的pod了
 > >
-> > <img src=".\asset\images\image-20250426211830040.png" alt="image-20250426211830040" style="zoom:67%;" />
+> > <img src="../../asset/images/image-20250426211830040.png" alt="image-20250426211830040" style="zoom:67%;" />
 
 
 
@@ -1522,7 +1522,7 @@ ConfigMap 是 Kubernetes 配置即代码理念的重要实现，极大简化了�
   >  restartPolicy: Never
   >```
   >
-  >![image-20250511123431296](.\asset\images\image-20250511123431296.png)
+  >![image-20250511123431296](../../asset/images/image-20250511123431296.png)
 
 - **将当前的configMap作为pod的启动命令** 
 
@@ -1573,10 +1573,10 @@ ConfigMap 是 Kubernetes 配置即代码理念的重要实现，极大简化了�
   >   restartPolicy: Never
   > ```
   >
-  > <img src=".\asset\images\image-20250511131809258.png" alt="image-20250511131809258" style="zoom:67%;" />
+  > <img src="../../asset/images/image-20250511131809258.png" alt="image-20250511131809258" style="zoom:67%;" />
   >
   >
-  > ![image-20250511132330148](.\asset\images\image-20250511132330148.png)
+  > ![image-20250511132330148](../../asset/images/image-20250511132330148.png)
 
 - **热更新**
 
@@ -1760,7 +1760,7 @@ Kubernetes 提供了多种预定义的 Secret 类型，通过 `type` 字段指�
 
 > - base64 编码
 >
-> ![image-20250511171514954](.\asset\images\image-20250511171514954.png)
+> ![image-20250511171514954](../../asset/images/image-20250511171514954.png)
 >
 > ```yaml
 > apiVersion: v1
@@ -1818,7 +1818,7 @@ Kubernetes 提供了多种预定义的 Secret 类型，通过 `type` 字段指�
 >
 > - 结果
 >
->   <img src=".\asset\images\image-20250511172452150.png" alt="image-20250511172452150" style="zoom:67%;" />
+>   <img src="../../asset/images/image-20250511172452150.png" alt="image-20250511172452150" style="zoom:67%;" />
 
 - 通过volume使用
 
@@ -2002,7 +2002,7 @@ volumes:    # 声明卷
   >
   >
   >
-  ><img src=".\asset\images\image-20250511180652978.png" alt="image-20250511180652978" style="zoom:67%;" />
+  ><img src="../../asset/images/image-20250511180652978.png" alt="image-20250511180652978" style="zoom:67%;" />
 
 
 
@@ -2069,7 +2069,7 @@ volumes:    # 声明卷
   >
   >
   >
-  ><img src=".\asset\images\image-20250511181402586.png" alt="image-20250511181402586" style="zoom:67%;" />
+  ><img src="../../asset/images/image-20250511181402586.png" alt="image-20250511181402586" style="zoom:67%;" />
 
 
 
@@ -3951,7 +3951,7 @@ API Server 通过 `--authorization-mode` 启动参数来配置授权策略，可
 
        
 
-     ![image-20250824113936069](.\asset\images\image-20250824113936069.png)
+     ![image-20250824113936069](../../asset/images/image-20250824113936069.png)
 
 > 绑定类型
 >
@@ -4247,7 +4247,7 @@ rules:
 
 
 
-> ![image-20250824134429400](.\asset\images\image-20250824134429400.png)
+> ![image-20250824134429400](../../asset/images/image-20250824134429400.png)
 >
 > #### 1. Helm v2 的架构与问题 (C/S 架构)
 >
@@ -4565,7 +4565,7 @@ Harbor 的目标是帮助用户迅速搭建一个企业级的 Docker registry �
 - RESTful API
 - 部署简单（Easy deployment）
 
-> ![image-20250831113026894](.\asset\images\image-20250831113026894.png)
+> ![image-20250831113026894](../../asset/images/image-20250831113026894.png)
 
 
 
@@ -4594,17 +4594,17 @@ loki  -- 云原生的日志服务器 可能是目前最具性价比的方案
 
 
 
-![image-20250831130946996](.\asset\images\image-20250831130946996.png)
+![image-20250831130946996](../../asset/images/image-20250831130946996.png)
 
 
 
-![image-20250831131145781](.\asset\images\image-20250831131145781.png)
+![image-20250831131145781](../../asset/images/image-20250831131145781.png)
 
 
 
-> ![image-20250831131333355](.\asset\images\image-20250831131333355.png)
+> ![image-20250831131333355](../../asset/images/image-20250831131333355.png)
 >
-> ![image-20250831132405216](.\asset\images\image-20250831132405216.png)
+> ![image-20250831132405216](../../asset/images/image-20250831132405216.png)
 >
 > 例如这种 CDN(内容分发) 在每个机房部署一个用于收集存储日志的 L 也好 K 也好 将内容推送至 es，这样虽然l或者k的资源占用比较高 但是也是可以接受的
 >
@@ -4656,7 +4656,7 @@ Loki 从一开始就是为动态的云原生环境（尤其是 Kubernetes）而�
 
 一个典型的 Loki 集群包含以下几个主要组件：
 
-![image-20250831140535821](.\asset\images\image-20250831140535821.png)
+![image-20250831140535821](../../asset/images/image-20250831140535821.png)
 
 1. **Distributor**：**分发器**，负责接收日志数据（例如从 Fluent Bit, Promtail 等而来），并进行校验和转发。
 2. **Ingester**：**摄取器**，接收来自 Distributor 的日志流，在内存中构建数据块并压缩，然后定期刷写到后端存储中。它是内存密集型组件，负责写操作。
@@ -4687,7 +4687,7 @@ Loki 从一开始就是为动态的云原生环境（尤其是 Kubernetes）而�
 - **已经使用 Prometheus + Grafana 技术栈的团队**：可以无缝整合，提升可观测性能力。
 - **不需要对日志内容进行复杂关联分析和全文搜索的场景**：Loki 更擅长基于标签的快速过滤和简单的内容搜索。
 
-> ![image-20250831133008454](.\asset\images\image-20250831133008454.png)
+> ![image-20250831133008454](../../asset/images/image-20250831133008454.png)
 >
 > | 特性               | Loki                                                 | ELK / EFK                                                    |
 > | :----------------- | :--------------------------------------------------- | :----------------------------------------------------------- |
@@ -4697,7 +4697,7 @@ Loki 从一开始就是为动态的云原生环境（尤其是 Kubernetes）而�
 > | **学习曲线**       | 较简单，尤其适合已有 Prometheus/Grafana 技术栈的用户 | 较复杂，组件多，功能丰富，配置和管理难度较大                 |
 > | **可视化工具**     | 使用 **Grafana**，与 Prometheus 等可观测数据无缝集成 | 使用 **Kibana**，提供强大的日志搜索和可视化仪表盘            |
 >
-> ![image-20250831140416027](.\asset\images\image-20250831140416027.png)
+> ![image-20250831140416027](../../asset/images/image-20250831140416027.png)
 
 ## 资源监控方案
 
@@ -4752,7 +4752,7 @@ prometheus
 >
 > > 一个例子
 > >
-> > ![image-20250831181921421](.\asset\images\image-20250831181921421.png)
+> > ![image-20250831181921421](../../asset/images/image-20250831181921421.png)
 
 
 
