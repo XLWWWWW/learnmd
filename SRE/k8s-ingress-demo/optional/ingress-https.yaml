@@ -1,0 +1,34 @@
+# 与 ingress.yaml 同名：apply 此文件会将该路由切换到 HTTPS。
+# 先在 ingress-demo 命名空间创建 demo-tls 证书 Secret。
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demo
+  namespace: ingress-demo
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik-demo
+  tls:
+    - hosts:
+        - demo.example.com
+      secretName: demo-tls
+  rules:
+    - host: demo.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api-svc
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-svc
+                port:
+                  number: 80

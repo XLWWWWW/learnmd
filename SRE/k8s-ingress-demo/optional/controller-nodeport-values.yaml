@@ -1,0 +1,9 @@
+# 自建集群入口：叠加在 controller-values.yaml 后传给 Helm。
+service:
+  type: NodePort
+
+ports:
+  web:
+    nodePort: 30080
+  websecure:
+    nodePort: 30443

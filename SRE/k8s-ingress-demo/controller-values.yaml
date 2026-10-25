@@ -1,0 +1,44 @@
+# Helm values：交给 helm 使用，不是 kubectl apply 的 Kubernetes 资源。
+fullnameOverride: ingress-demo-traefik
+
+deployment:
+  replicas: 2
+
+ingressClass:
+  enabled: true
+  name: traefik-demo
+  isDefaultClass: false
+
+providers:
+  kubernetesCRD:
+    enabled: false
+  kubernetesIngress:
+    enabled: true
+    ingressClass: traefik-demo
+    publishedService:
+      enabled: true
+
+# 让 Prefix 按路径段匹配：/api 匹配 /api/users，但不匹配 /apix。
+additionalArguments:
+  - --providers.kubernetesingress.strictprefixmatching=true
+
+service:
+  type: LoadBalancer
+  # 公网/内网 LB 的选择可能需要云厂商专用 annotations 或 loadBalancerClass。
+  # 本例假定平台已支持供应公网 LoadBalancer。
+
+ports:
+  web:
+    port: 8000
+    expose:
+      default: true
+    exposedPort: 80
+  websecure:
+    port: 8443
+    expose:
+      default: true
+    exposedPort: 443
+
+logs:
+  access:
+    enabled: true
